@@ -1,0 +1,18 @@
+# ── Hardhat ───────────────────────────────
+music-trade-hardhat/node_modules/
+music-trade-hardhat/artifacts/
+music-trade-hardhat/cache/
+music-trade-hardhat/.env          # 프라이빗 키 — 절대 커밋 금지
+
+# ── Java / Maven ──────────────────────────
+music-trade-java/target/
+music-trade-java/.env
+
+# ── IDE ───────────────────────────────────
+.idea/
+.vscode/
+*.iml
+
+# ── OS ────────────────────────────────────
+.DS_Store
+Thumbs.db
