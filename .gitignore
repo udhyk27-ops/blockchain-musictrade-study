@@ -2,7 +2,7 @@
 music-trade-hardhat/node_modules/
 music-trade-hardhat/artifacts/
 music-trade-hardhat/cache/
-music-trade-hardhat/.env          # 프라이빗 키 — 절대 커밋 금지
+music-trade-hardhat/.env
 
 # ── Java / Maven ──────────────────────────
 music-trade-java/target/
@@ -16,3 +16,5 @@ music-trade-java/.env
 # ── OS ────────────────────────────────────
 .DS_Store
 Thumbs.db
+
+.env
