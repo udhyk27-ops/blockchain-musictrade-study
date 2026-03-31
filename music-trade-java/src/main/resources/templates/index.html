@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Music Trade</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: Arial, sans-serif; max-width: 750px; margin: 40px auto; padding: 0 20px; }
+        h1 { font-size: 18px; margin-bottom: 10px; }
+        .wallet-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; padding: 10px; border: 1px solid #ddd; background: #f9f9f9; }
+        .wallet-address { font-size: 12px; color: #333; word-break: break-all; }
+        .section { border: 1px solid #ddd; padding: 15px; margin-bottom: 15px; }
+        h2 { font-size: 14px; margin-bottom: 10px; }
+        input { padding: 6px 8px; margin: 3px; border: 1px solid #ccc; width: 220px; font-size: 13px; }
+        button { padding: 6px 14px; margin: 3px; background: #fff; border: 1px solid #999; cursor: pointer; font-size: 13px; }
+        button:hover { background: #eee; }
+        .result { margin-top: 10px; padding: 10px; background: #f9f9f9; border: 1px solid #ddd; display: none; }
+        .error { border-color: red; background: #fff5f5; }
+        pre { font-size: 12px; white-space: pre-wrap; word-break: break-all; }
+        .disconnected { color: #999; font-size: 13px; }
+    </style>
+</head>
+<body>
+
+<h1>Music Trade 블록체인</h1>
+
+<!-- 지갑 연결 -->
+<div class="wallet-bar">
+    <button id="connectBtn" onclick="connectWallet()">지갑 연결</button>
+    <button id="disconnectBtn" onclick="disconnectWallet()" style="display:none;">로그아웃</button>
+    <span id="walletStatus" class="disconnected">연결되지 않음</span>
+</div>
+
+<!-- 곡 등록 -->
+<div class="section">
+    <h2>곡 등록</h2>
+    <input type="text" id="reg-title" placeholder="제목" />
+    <input type="text" id="reg-artist" placeholder="아티스트" />
+    <input type="text" id="reg-genre" placeholder="장르" />
+    <button onclick="registerSong()">등록</button>
+    <div id="reg-result" class="result"></div>
+</div>
+
+<!-- 판매 등록 -->
+<div class="section">
+    <h2>판매 등록</h2>
+    <input type="number" id="list-songId" placeholder="곡 ID" />
+    <input type="number" id="list-price" placeholder="가격 (ETH)" step="0.01" />
+    <button onclick="listSong()">판매 등록</button>
+    <div id="list-result" class="result"></div>
+</div>
+
+<!-- 판매 취소 -->
+<div class="section">
+    <h2>판매 취소</h2>
+    <input type="number" id="delist-songId" placeholder="곡 ID" />
+    <button onclick="delistSong()">판매 취소</button>
+    <div id="delist-result" class="result"></div>
+</div>
+
+<!-- 곡 구매 -->
+<div class="section">
+    <h2>곡 구매</h2>
+    <input type="number" id="buy-songId" placeholder="곡 ID" />
+    <input type="number" id="buy-value" placeholder="가격 (ETH)" step="0.01" />
+    <button onclick="buySong()">구매</button>
+    <div id="buy-result" class="result"></div>
+</div>
+
+<!-- 곡 조회 -->
+<div class="section">
+    <h2>곡 조회</h2>
+    <input type="number" id="song-songId" placeholder="곡 ID" />
+    <button onclick="getSong()">조회</button>
+    <div id="song-result" class="result"></div>
+</div>
+
+<!-- 전체 곡 수 -->
+<div class="section">
+    <h2>전체 곡 수</h2>
+    <button onclick="totalSongs()">조회</button>
+    <div id="total-result" class="result"></div>
+</div>
+
+<!-- 판매 중인 곡 목록 -->
+<div class="section">
+    <h2>판매 중인 곡 목록</h2>
+    <button onclick="getForSaleList()">조회</button>
+    <div id="forsale-result" class="result"></div>
+</div>
+
+<!-- 내 곡 목록 -->
+<div class="section">
+    <h2>내 곡 목록</h2>
+    <button onclick="getMySongs()">조회</button>
+    <div id="owner-result" class="result"></div>
+</div>
+
+<!-- 전체 거래 이력 -->
+<div class="section">
+    <h2>전체 거래 이력</h2>
+    <button onclick="getTradeHistory()">조회</button>
+    <div id="trades-result" class="result"></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
+
+<script>
+    const CONTRACT_ADDRESS = '0x403E2E454D9E7D83237c2CF4cD23bAc74143e27d';
+    const BESU_RPC = 'http://192.168.56.101:8545';
+    const API = '/api/music';
+
+    let provider = null;
+    let signer = null;
+    let contract = null;
+    let walletAddress = null;
+    let abi = null;
+
+    // ─── ABI 로드 ─────────────────────────────────────
+    async function loadAbi() {
+        const res = await fetch('/MusicTrade.abi');
+        abi = await res.json();
+    }
+
+    // ─── 지갑 연결 ────────────────────────────────────
+    async function connectWallet() {
+        if (typeof window.ethereum === 'undefined') {
+            alert('MetaMask가 설치되어 있지 않아요!');
+            return;
+        }
+        try {
+            await loadAbi();
+
+            provider = new ethers.BrowserProvider(window.ethereum);
+
+            // 계정 선택 팝업 강제로 띄우기
+            await provider.send('wallet_requestPermissions', [{ eth_accounts: {} }]);
+            await provider.send('eth_requestAccounts', []);
+
+            signer = await provider.getSigner();
+            walletAddress = await signer.getAddress();
+
+            contract = new ethers.Contract(CONTRACT_ADDRESS, abi, signer);
+
+            document.getElementById('walletStatus').textContent = walletAddress;
+            document.getElementById('walletStatus').className = 'wallet-address';
+            document.getElementById('connectBtn').textContent = '연결됨';
+            document.getElementById('connectBtn').disabled = true;
+            document.getElementById('disconnectBtn').style.display = 'inline';
+
+        } catch (e) {
+            alert('지갑 연결 실패: ' + e.message);
+        }
+    }
+
+    // ─── 지갑 로그아웃 ───────────────────────────────
+    function disconnectWallet() {
+        provider = null;
+        signer = null;
+        contract = null;
+        walletAddress = null;
+
+        document.getElementById('walletStatus').textContent = '연결되지 않음';
+        document.getElementById('walletStatus').className = 'disconnected';
+        document.getElementById('connectBtn').textContent = '지갑 연결';
+        document.getElementById('connectBtn').disabled = false;
+        document.getElementById('disconnectBtn').style.display = 'none';
+    }
+
+    // ─── 지갑 연결 확인 ───────────────────────────────
+    function checkWallet() {
+        if (!contract) {
+            alert('먼저 지갑을 연결해주세요!');
+            return false;
+        }
+        return true;
+    }
+
+    // ─── 유틸 ─────────────────────────────────────────
+    function show(id, data, isError) {
+        const el = document.getElementById(id);
+        el.style.display = 'block';
+        el.className = 'result' + (isError ? ' error' : '');
+        el.innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+    }
+
+    function bigIntReplacer(key, value) {
+        return typeof value === 'bigint' ? value.toString() : value;
+    }
+
+    function showData(id, data, isError) {
+        const el = document.getElementById(id);
+        el.style.display = 'block';
+        el.className = 'result' + (isError ? ' error' : '');
+        el.innerHTML = '<pre>' + JSON.stringify(data, null, 2, bigIntReplacer) + '</pre>';
+    }
+
+    // ─── 곡 등록 ──────────────────────────────────────
+    async function registerSong() {
+        if (!checkWallet()) return;
+        try {
+            const title = document.getElementById('reg-title').value;
+            const artist = document.getElementById('reg-artist').value;
+            const genre = document.getElementById('reg-genre').value;
+            const tx = await contract.registerSong(title, artist, genre, {
+                gasPrice: 0
+            });
+
+            show('reg-result', { status: '트랜잭션 전송됨', txHash: tx.hash }, false);
+            await tx.wait();
+            show('reg-result', { status: '완료', txHash: tx.hash }, false);
+        } catch (e) {
+            show('reg-result', { error: e.message }, true);
+        }
+    }
+
+    // ─── 판매 등록 ────────────────────────────────────
+    async function listSong() {
+        if (!checkWallet()) return;
+        try {
+            const songId = document.getElementById('list-songId').value;
+            const price = ethers.parseEther(document.getElementById('list-price').value);
+            const tx = await contract.listForSale(songId, price, {
+                gasPrice: 0
+            });
+            show('list-result', { status: '트랜잭션 전송됨', txHash: tx.hash }, false);
+            await tx.wait();
+            show('list-result', { status: '완료', txHash: tx.hash }, false);
+        } catch (e) {
+            show('list-result', { error: e.message }, true);
+        }
+    }
+
+    // ─── 판매 취소 ────────────────────────────────────
+    async function delistSong() {
+        if (!checkWallet()) return;
+        try {
+            const songId = document.getElementById('delist-songId').value;
+            const tx = await contract.delistSong(songId, {
+                gasPrice: 0
+            });
+            show('delist-result', { status: '트랜잭션 전송됨', txHash: tx.hash }, false);
+            await tx.wait();
+            show('delist-result', { status: '완료', txHash: tx.hash }, false);
+        } catch (e) {
+            show('delist-result', { error: e.message }, true);
+        }
+    }
+
+    // ─── 곡 구매 ──────────────────────────────────────
+    async function buySong() {
+        if (!checkWallet()) return;
+        try {
+            const songId = document.getElementById('buy-songId').value;
+            const value = ethers.parseEther(document.getElementById('buy-value').value);
+            const tx = await contract.buySong(songId, {
+                value,
+                gasPrice: 0
+            });
+            show('buy-result', { status: '트랜잭션 전송됨', txHash: tx.hash }, false);
+            await tx.wait();
+            show('buy-result', { status: '완료', txHash: tx.hash }, false);
+        } catch (e) {
+            show('buy-result', { error: e.message }, true);
+        }
+    }
+
+    // ─── 곡 조회 (Spring Boot API) ────────────────────
+    async function getSong() {
+        const songId = document.getElementById('song-songId').value;
+        const res = await fetch(`${API}/song/${songId}`);
+        const data = await res.json();
+        show('song-result', data, data.error);
+    }
+
+    // ─── 전체 곡 수 ───────────────────────────────────
+    async function totalSongs() {
+        const res = await fetch(`${API}/total`);
+        const data = await res.json();
+        show('total-result', { totalSongs: data }, false);
+    }
+
+    // ─── 판매 중인 곡 목록 ────────────────────────────
+    async function getForSaleList() {
+        const res = await fetch(`${API}/forsale`);
+        const data = await res.json();
+        show('forsale-result', data, data.error);
+    }
+
+    // ─── 내 곡 목록 ───────────────────────────────────
+    async function getMySongs() {
+        if (!checkWallet()) return;
+        const res = await fetch(`${API}/owner/${walletAddress}`);
+        const data = await res.json();
+        show('owner-result', data, data.error);
+    }
+
+    // ─── 전체 거래 이력 ───────────────────────────────
+    async function getTradeHistory() {
+        const res = await fetch(`${API}/trades`);
+        const data = await res.json();
+        show('trades-result', data, data.error);
+    }
+</script>
+</body>
+</html>

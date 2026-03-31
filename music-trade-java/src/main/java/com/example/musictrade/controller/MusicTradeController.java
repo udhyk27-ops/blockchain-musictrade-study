@@ -1,6 +1,5 @@
 package com.example.musictrade.controller;
 
-import com.example.musictrade.dto.RegisterSongRequest;
 import com.example.musictrade.dto.SongDto;
 import com.example.musictrade.dto.TradeRecordDto;
 import com.example.musictrade.service.MusicTradeService;
@@ -19,38 +18,6 @@ public class MusicTradeController {
 
     private final MusicTradeService musicTradeService;
 
-    // 곡 등록
-    @PostMapping("/register")
-    public ResponseEntity<Map<String, String>> registerSong(@RequestBody RegisterSongRequest request) throws Exception {
-        String txHash = musicTradeService.registerSong(request);
-        return ResponseEntity.ok(Map.of("txHash", txHash));
-    }
-
-    // 판매 등록
-    @PostMapping("/list/{songId}")
-    public ResponseEntity<Map<String, String>> listForSale(
-            @PathVariable BigInteger songId,
-            @RequestParam BigInteger price) throws Exception {
-        String txHash = musicTradeService.listForSale(songId, price);
-        return ResponseEntity.ok(Map.of("txHash", txHash));
-    }
-
-    // 판매 취소
-    @PostMapping("/delist/{songId}")
-    public ResponseEntity<Map<String, String>> delistSong(@PathVariable BigInteger songId) throws Exception {
-        String txHash = musicTradeService.delistSong(songId);
-        return ResponseEntity.ok(Map.of("txHash", txHash));
-    }
-
-    // 곡 구매
-    @PostMapping("/buy/{songId}")
-    public ResponseEntity<Map<String, String>> buySong(
-            @PathVariable BigInteger songId,
-            @RequestParam BigInteger value) throws Exception {
-        String txHash = musicTradeService.buySong(songId, value);
-        return ResponseEntity.ok(Map.of("txHash", txHash));
-    }
-
     // 곡 조회
     @GetMapping("/song/{songId}")
     public ResponseEntity<SongDto> getSong(@PathVariable BigInteger songId) throws Exception {
@@ -59,8 +26,8 @@ public class MusicTradeController {
 
     // 전체 곡 수
     @GetMapping("/total")
-    public ResponseEntity<BigInteger> totalSongs() throws Exception {
-        return ResponseEntity.ok(musicTradeService.totalSongs());
+    public ResponseEntity<Map<String, String>> totalSongs() throws Exception {
+        return ResponseEntity.ok(Map.of("totalSongs", musicTradeService.totalSongs().toString()));
     }
 
     // 판매 중인 곡 목록

@@ -1,6 +1,5 @@
 package com.example.musictrade.service;
 
-import com.example.musictrade.dto.RegisterSongRequest;
 import com.example.musictrade.dto.SongDto;
 import com.example.musictrade.dto.TradeRecordDto;
 import lombok.RequiredArgsConstructor;
@@ -12,13 +11,10 @@ import org.web3j.abi.FunctionReturnDecoder;
 import org.web3j.abi.TypeReference;
 import org.web3j.abi.datatypes.*;
 import org.web3j.abi.datatypes.generated.Uint256;
-import org.web3j.crypto.Credentials;
 import org.web3j.protocol.Web3j;
 import org.web3j.protocol.core.DefaultBlockParameterName;
 import org.web3j.protocol.core.methods.request.Transaction;
 import org.web3j.protocol.core.methods.response.EthCall;
-import org.web3j.tx.RawTransactionManager;
-import org.web3j.tx.gas.DefaultGasProvider;
 
 import java.math.BigInteger;
 import java.util.ArrayList;
@@ -37,67 +33,7 @@ public class MusicTradeService {
     @Value("${besu.contract.address}")
     private String contractAddress;
 
-    @Value("${besu.wallet.private-key}")
-    private String privateKey;
-
-    private Credentials getCredentials() {
-        return Credentials.create(privateKey);
-    }
-
-    // ─── 곡 등록 ───────────────────────────────────────
-    public String registerSong(RegisterSongRequest req) throws Exception {
-        Function function = new Function(
-                "registerSong",
-                Arrays.asList(
-                        new Utf8String(req.getTitle()),
-                        new Utf8String(req.getArtist()),
-                        new Utf8String(req.getGenre())
-                ),
-                Collections.emptyList()
-        );
-        return sendTransaction(function);
-    }
-
-    // ─── 판매 등록 ─────────────────────────────────────
-    public String listForSale(BigInteger songId, BigInteger price) throws Exception {
-        Function function = new Function(
-                "listForSale",
-                Arrays.asList(new Uint256(songId), new Uint256(price)),
-                Collections.emptyList()
-        );
-        return sendTransaction(function);
-    }
-
-    // ─── 판매 취소 ─────────────────────────────────────
-    public String delistSong(BigInteger songId) throws Exception {
-        Function function = new Function(
-                "delistSong",
-                Collections.singletonList(new Uint256(songId)),
-                Collections.emptyList()
-        );
-        return sendTransaction(function);
-    }
-
-    // ─── 곡 구매 ───────────────────────────────────────
-    public String buySong(BigInteger songId, BigInteger value) throws Exception {
-        Credentials credentials = getCredentials();
-        RawTransactionManager txManager = new RawTransactionManager(web3j, credentials, 1337L);
-
-        Function function = new Function(
-                "buySong",
-                Collections.singletonList(new Uint256(songId)),
-                Collections.emptyList()
-        );
-        String encodedFunction = FunctionEncoder.encode(function);
-
-        return txManager.sendTransaction(
-                DefaultGasProvider.GAS_PRICE,
-                DefaultGasProvider.GAS_LIMIT,
-                contractAddress,
-                encodedFunction,
-                value
-        ).getTransactionHash();
-    }
+    private static final String ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
     // ─── 곡 조회 ───────────────────────────────────────
     public SongDto getSong(BigInteger songId) throws Exception {
@@ -108,20 +44,18 @@ public class MusicTradeService {
         );
 
         String encodedFunction = FunctionEncoder.encode(function);
-        Credentials credentials = getCredentials();
 
         EthCall response = web3j.ethCall(
                 Transaction.createEthCallTransaction(
-                        credentials.getAddress(),
+                        ZERO_ADDRESS,
                         contractAddress,
                         encodedFunction
                 ),
                 DefaultBlockParameterName.LATEST
         ).send();
 
-        // struct는 첫 32바이트(64자)가 tuple offset → 건너뛰기
         String rawData = response.getValue();
-        String strippedData = "0x" + rawData.substring(66); // 0x + 32bytes offset 제거
+        String strippedData = "0x" + rawData.substring(66);
 
         List<TypeReference<Type>> outputParams = new ArrayList<>();
         outputParams.add((TypeReference) new TypeReference<Uint256>() {});
@@ -199,29 +133,13 @@ public class MusicTradeService {
         return parseTradeRecords((DynamicArray<?>) result.get(0));
     }
 
-    // ─── 공통: 트랜잭션 전송 ───────────────────────────
-    private String sendTransaction(Function function) throws Exception {
-        Credentials credentials = getCredentials();
-        RawTransactionManager txManager = new RawTransactionManager(web3j, credentials, 1337L);
-        String encodedFunction = FunctionEncoder.encode(function);
-
-        return txManager.sendTransaction(
-                DefaultGasProvider.GAS_PRICE,
-                DefaultGasProvider.GAS_LIMIT,
-                contractAddress,
-                encodedFunction,
-                BigInteger.ZERO
-        ).getTransactionHash();
-    }
-
     // ─── 공통: view 함수 호출 ──────────────────────────
     private List<Type> callFunction(Function function) throws Exception {
         String encodedFunction = FunctionEncoder.encode(function);
-        Credentials credentials = getCredentials();
 
         EthCall response = web3j.ethCall(
                 Transaction.createEthCallTransaction(
-                        credentials.getAddress(),
+                        ZERO_ADDRESS,
                         contractAddress,
                         encodedFunction
                 ),

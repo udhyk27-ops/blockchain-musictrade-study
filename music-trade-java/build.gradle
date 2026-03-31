@@ -31,9 +31,12 @@ dependencies {
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 
-	// Web3j 추가
+	// Web3j
 	implementation 'org.web3j:core:4.9.8'
+	// env
 	implementation 'io.github.cdimascio:dotenv-java:3.0.0'
+	// thymeleaf
+	implementation 'org.springframework.boot:spring-boot-starter-thymeleaf'
 }
 
 tasks.named('test') {
