@@ -106,7 +106,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
 
 <script>
-    const CONTRACT_ADDRESS = '0xBC69Cf59bbF7728d0C2984398f5A6C4E7D1DC437';
+    const CONTRACT_ADDRESS = '[[${contractAddress}]]';
     const BESU_RPC = 'http://192.168.56.101:8545';
     const API = '/api/music';
 
@@ -143,15 +143,8 @@
             try {
                 await provider.send('wallet_switchEthereumChain', [{ chainId: '0x539' }]);
             } catch (switchError) {
-                // 네트워크 없으면 자동 추가
-                if (switchError.code === 4902) {
-                    await provider.send('wallet_addEthereumChain', [{
-                        chainId: '0x539',
-                        chainName: 'Besu Private',
-                        rpcUrls: ['http://192.168.56.101:8545'],
-                        nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 }
-                    }]);
-                }
+                alert('MetaMask에서 Besu Private 네트워크로 전환해주세요! (Chain ID: 1337)');
+                return;
             }
 
             // 매번 계정 선택 팝업 강제로 띄우기
