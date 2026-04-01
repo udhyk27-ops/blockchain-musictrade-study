@@ -18,7 +18,6 @@ import org.web3j.protocol.core.methods.response.EthCall;
 
 import java.math.BigInteger;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -55,6 +54,13 @@ public class MusicTradeService {
         ).send();
 
         String rawData = response.getValue();
+
+        // rawData가 null이거나 너무 짧으면 빈 결과 반환
+        if (rawData == null || rawData.length() < 66) {
+            log.warn("getSong rawData null or too short: {}", rawData);
+            return null;
+        }
+
         String strippedData = "0x" + rawData.substring(66);
 
         List<TypeReference<Type>> outputParams = new ArrayList<>();
@@ -68,6 +74,11 @@ public class MusicTradeService {
         outputParams.add((TypeReference) new TypeReference<Uint256>() {});
 
         List<Type> decoded = FunctionReturnDecoder.decode(strippedData, outputParams);
+
+        if (decoded == null || decoded.isEmpty()) {
+            log.warn("getSong decoded is empty for songId: {}", songId);
+            return null;
+        }
 
         return SongDto.builder()
                 .id(((Uint256) decoded.get(0)).getValue())
@@ -89,6 +100,10 @@ public class MusicTradeService {
                 Collections.singletonList(new TypeReference<Uint256>() {})
         );
         List<Type> result = callFunction(function);
+
+        if (result == null || result.isEmpty()) {
+            return BigInteger.ZERO;
+        }
         return ((Uint256) result.get(0)).getValue();
     }
 
@@ -100,6 +115,10 @@ public class MusicTradeService {
                 Collections.singletonList(new TypeReference<DynamicArray<Uint256>>() {})
         );
         List<Type> result = callFunction(function);
+
+        if (result == null || result.isEmpty()) {
+            return Collections.emptyList();
+        }
         return ((DynamicArray<Uint256>) result.get(0))
                 .getValue()
                 .stream()
@@ -115,6 +134,10 @@ public class MusicTradeService {
                 Collections.singletonList(new TypeReference<DynamicArray<Uint256>>() {})
         );
         List<Type> result = callFunction(function);
+
+        if (result == null || result.isEmpty()) {
+            return Collections.emptyList();
+        }
         return ((DynamicArray<Uint256>) result.get(0))
                 .getValue()
                 .stream()
@@ -130,6 +153,10 @@ public class MusicTradeService {
                 Collections.singletonList(new TypeReference<DynamicArray<DynamicStruct>>() {})
         );
         List<Type> result = callFunction(function);
+
+        if (result == null || result.isEmpty()) {
+            return Collections.emptyList();
+        }
         return parseTradeRecords((DynamicArray<?>) result.get(0));
     }
 
@@ -146,11 +173,20 @@ public class MusicTradeService {
                 DefaultBlockParameterName.LATEST
         ).send();
 
-        return FunctionReturnDecoder.decode(response.getValue(), function.getOutputParameters());
+        String value = response.getValue();
+        if (value == null || value.equals("0x")) {
+            log.warn("callFunction returned null or empty for: {}", function.getName());
+            return Collections.emptyList();
+        }
+
+        return FunctionReturnDecoder.decode(value, function.getOutputParameters());
     }
 
     // ─── 공통: TradeRecord 파싱 ────────────────────────
     private List<TradeRecordDto> parseTradeRecords(DynamicArray<?> array) {
+        if (array == null || array.getValue().isEmpty()) {
+            return Collections.emptyList();
+        }
         return array.getValue().stream().map(item -> {
             List<Type> fields = ((DynamicStruct) item).getValue();
             return TradeRecordDto.builder()
