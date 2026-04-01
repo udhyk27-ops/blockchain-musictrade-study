@@ -106,7 +106,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
 
 <script>
-    const CONTRACT_ADDRESS = '0x403E2E454D9E7D83237c2CF4cD23bAc74143e27d';
+    const CONTRACT_ADDRESS = '0xBC69Cf59bbF7728d0C2984398f5A6C4E7D1DC437';
     const BESU_RPC = 'http://192.168.56.101:8545';
     const API = '/api/music';
 
@@ -133,9 +133,8 @@
 
             provider = new ethers.BrowserProvider(window.ethereum);
 
-            // 계정 선택 팝업 강제로 띄우기
+            // 매번 계정 선택 팝업 강제로 띄우기
             await provider.send('wallet_requestPermissions', [{ eth_accounts: {} }]);
-            await provider.send('eth_requestAccounts', []);
 
             signer = await provider.getSigner();
             walletAddress = await signer.getAddress();
@@ -205,7 +204,6 @@
             const tx = await contract.registerSong(title, artist, genre, {
                 gasPrice: 0
             });
-
             show('reg-result', { status: '트랜잭션 전송됨', txHash: tx.hash }, false);
             await tx.wait();
             show('reg-result', { status: '완료', txHash: tx.hash }, false);
