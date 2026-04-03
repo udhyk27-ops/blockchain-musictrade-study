@@ -98,7 +98,7 @@
 <div class="section">
     <h2>6. 라이선스 구매 이력 (LicensePurchased 이벤트)</h2>
     <p class="section-label">지갑 연결 불필요 | Song ID 비우면 전체 조회</p>
-    Song ID: <input type="number" id="license-songId" placeholder="전체조회시 비움" style="width:120px">
+    Song ID: <input type="number" id="license-songId" placeholder="전체 조회시 입력X" style="width:150px">
     <button onclick="getLicenseHistory()">조회</button>
     <div id="license-result" class="result"></div>
 </div>
@@ -107,7 +107,7 @@
 <div class="section">
     <h2>7. 정산 이력 (RoyaltyPaid 이벤트)</h2>
     <p class="section-label">지갑 연결 불필요 | Song ID / 지갑주소 각각 또는 동시 필터 가능</p>
-    Song ID: <input type="number" id="royalty-songId" placeholder="전체조회시 비움" style="width:120px">
+    Song ID: <input type="number" id="royalty-songId" placeholder="전체 조회시 입력X" style="width:150px">
     지갑주소: <input type="text" id="royalty-wallet" placeholder="0x... (비우면 전체)" size="42">
     <button onclick="getRoyaltyHistory()">조회</button>
     <div id="royalty-result" class="result"></div>
@@ -246,12 +246,6 @@
             const receipt = await tx.wait();
             const songId  = parseInt(receipt.logs[0].topics[1], 16);
             show('reg-result', { status: '완료', txHash: tx.hash, songId });
-            document.getElementById('shares-songId').value  = songId;
-            document.getElementById('buy-songId').value     = songId;
-            document.getElementById('info-songId').value    = songId;
-            document.getElementById('holders-songId').value = songId;
-            document.getElementById('license-songId').value = songId;
-            document.getElementById('royalty-songId').value = songId;
         } catch (e) {
             show('reg-result', { error: e.message }, true);
         }
