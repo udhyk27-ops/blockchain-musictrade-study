@@ -1,19 +1,18 @@
-const { ethers } = require("hardhat");
+const hre = require("hardhat");
 
 async function main() {
-  const [deployer] = await ethers.getSigners();
-
+  const [deployer] = await hre.ethers.getSigners();
   console.log("배포 계정:", deployer.address);
-  console.log("계정 잔액:", ethers.formatEther(
-    await ethers.provider.getBalance(deployer.address)
-  ), "ETH");
 
-  const MusicTrade = await ethers.getContractFactory("MusicTrade");
-  const contract = await MusicTrade.deploy();
+  const balance = await hre.ethers.provider.getBalance(deployer.address);
+  console.log("잔액:", hre.ethers.formatEther(balance), "ETH");
+
+  const MusicRoyalty = await hre.ethers.getContractFactory("MusicRoyalty");
+  const contract = await MusicRoyalty.deploy();
   await contract.waitForDeployment();
 
   const address = await contract.getAddress();
-  console.log("MusicTrade 배포 완료:", address);
+  console.log("MusicRoyalty 배포 주소:", address);
 }
 
 main().catch((e) => {
