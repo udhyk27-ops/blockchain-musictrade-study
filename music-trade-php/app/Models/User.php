@@ -2,20 +2,35 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Database\Factories\UserFactory;
-use Illuminate\Database\Eloquent\Attributes\Fillable;
-use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
-#[Fillable(['name', 'email', 'password'])]
-#[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable;
+
+    protected $table = 'T_USER';
+    protected $primaryKey = 'F_ID';
+    protected $keyType = 'string';
+
+
+    protected $fillable = [
+        'F_ID',
+        'F_PASSWORD',
+        'F_MAIL',
+        'F_WALLET_ADDRESS',
+        'F_REG_DATE',
+        'F_MOD_DATE'
+    ];
+
+    protected $hidden = [
+        'F_PASSWORD',
+    ];
+
+
 
     /**
      * Get the attributes that should be cast.
@@ -25,8 +40,8 @@ class User extends Authenticatable
     protected function casts(): array
     {
         return [
-            'email_verified_at' => 'datetime',
-            'password' => 'hashed',
+            'F_MOD_DATE' => 'datetime',
+            'F_PASSWORD' => 'hashed',
         ];
     }
 }
