@@ -1,7 +1,15 @@
 <?php
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\LoginController;
 use Illuminate\Support\Facades\Route;
+
+// TEST
+Route::get('/hash-test', function() {
+    dd(bcrypt('2'), bcrypt('2'));
+});
+
+
 
 // 로그인/로그아웃
 Route::get('/login',  [LoginController::class, 'index'])->name('login');
@@ -13,8 +21,9 @@ Route::get('/song-info', [Controller::class, 'getSongInfo']);
 
 // 로그인 필요
 Route::middleware('auth')->group(function() {
-    Route::get('/',                   [Controller::class, 'index']);
+    Route::get('/',                   [Controller::class, 'index'])->name('index');
     Route::post('/encode-register',   [Controller::class, 'encodeRegister']);
     Route::post('/encode-set-shares', [Controller::class, 'encodeSetShares']);
     Route::post('/encode-purchase',   [Controller::class, 'encodePurchase']);
 });
+

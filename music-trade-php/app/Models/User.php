@@ -9,39 +9,43 @@ use Illuminate\Notifications\Notifiable;
 
 class User extends Authenticatable
 {
-    /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable;
 
-    protected $table = 'T_USER';
-    protected $primaryKey = 'F_ID';
-    protected $keyType = 'string';
-
+    protected $table      = 'T_USER';
+    protected $primaryKey = 'f_id';
+    protected $keyType    = 'string';
+    public $incrementing  = false;
+    public $timestamps    = false;
 
     protected $fillable = [
-        'F_ID',
-        'F_PASSWORD',
-        'F_MAIL',
-        'F_WALLET_ADDRESS',
-        'F_REG_DATE',
-        'F_MOD_DATE'
+        'f_id',
+        'f_password',
+        'f_mail',
+        'f_wallet_address',
+        'f_reg_date',
+        'f_mod_date',
+        'f_status',
     ];
 
     protected $hidden = [
-        'F_PASSWORD',
+        'f_password',
     ];
 
-
-
-    /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
-     */
     protected function casts(): array
     {
         return [
-            'F_MOD_DATE' => 'datetime',
-            'F_PASSWORD' => 'hashed',
+            'f_mod_date' => 'datetime',
+            'f_password' => 'hashed',
         ];
+    }
+
+    public function getAuthPasswordName(): string
+    {
+        return 'f_password';
+    }
+
+    public function getRememberTokenName()
+    {
+        return null;
     }
 }

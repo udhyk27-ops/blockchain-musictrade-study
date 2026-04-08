@@ -29,7 +29,8 @@ class Controller
         }
 
         return view('index', [
-            'songCount'       => $songCount,
+            'songCount
+            '       => $songCount,
             'contractAddress' => config('besu.contract_address'),
             'chainId'         => config('besu.chain_id'),
             'error'           => $error,
