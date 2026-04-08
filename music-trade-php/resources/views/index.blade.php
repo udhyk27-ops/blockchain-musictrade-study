@@ -31,12 +31,19 @@
 <div class="wallet-bar">
     <button id="connectBtn" onclick="connectWallet()">지갑 연결</button>
     <button id="disconnectBtn" onclick="disconnectWallet()" style="display:none">로그아웃</button>
+
     <span id="walletStatus" class="disconnected">연결되지 않음</span>
+
+    <form method="post" action="{{ route('logout') }}">
+        @csrf
+        <button type="submit">로그아웃</button>
+    </form>
+
 </div>
 
 {{-- 1. 곡 등록 --}}
 <div class="section">
-    <h2>1. 곡 등록 (registerSong)</h2>
+    <h2>곡 등록 (registerSong)</h2>
     <p class="section-label">지갑 연결 필요</p>
     <input type="text" id="reg-title" placeholder="곡 제목">
     <button onclick="registerSong()">등록</button>
@@ -45,7 +52,7 @@
 
 {{-- 2. 지분율 설정 --}}
 <div class="section">
-    <h2>2. 지분율 설정 (setShares)</h2>
+    <h2>지분율 설정 (setShares)</h2>
     <p class="section-label">지갑 연결 필요 | 곡 등록자만 가능 | 합계 100%</p>
     Song ID: <input type="number" id="shares-songId" placeholder="Song ID" style="width:80px">
     <div id="holders-wrap">
@@ -68,7 +75,7 @@
 
 {{-- 3. 라이선스 구매 --}}
 <div class="section">
-    <h2>3. 라이선스 구매 (purchaseLicense)</h2>
+    <h2>라이선스 구매 (purchaseLicense)</h2>
     <p class="section-label">지갑 연결 필요 | 구매 즉시 권리자에게 자동 정산</p>
     Song ID: <input type="number" id="buy-songId" placeholder="Song ID" style="width:80px">
     금액(ETH): <input type="number" id="buy-amount" value="0.01" step="0.001" style="width:80px">
@@ -78,7 +85,7 @@
 
 {{-- 4. 곡 정보 조회 --}}
 <div class="section">
-    <h2>4. 곡 정보 조회 (getSongInfo)</h2>
+    <h2>곡 정보 조회 (getSongInfo)</h2>
     <p class="section-label">지갑 연결 불필요</p>
     Song ID: <input type="number" id="info-songId" placeholder="Song ID" style="width:80px">
     <button onclick="getSongInfo()">조회</button>
@@ -87,7 +94,7 @@
 
 {{-- 5. 지분율 조회 --}}
 <div class="section">
-    <h2>5. 지분율 조회 (getHolders)</h2>
+    <h2>지분율 조회 (getHolders)</h2>
     <p class="section-label">지갑 연결 불필요</p>
     Song ID: <input type="number" id="holders-songId" placeholder="Song ID" style="width:80px">
     <button onclick="getHolders()">조회</button>
@@ -96,26 +103,26 @@
 
 {{-- 6. 라이선스 구매 이력 조회 --}}
 <div class="section">
-    <h2>6. 라이선스 구매 이력 (LicensePurchased 이벤트)</h2>
+    <h2>라이선스 구매 이력 (LicensePurchased 이벤트)</h2>
     <p class="section-label">지갑 연결 불필요 | Song ID 비우면 전체 조회</p>
     Song ID: <input type="number" id="license-songId" placeholder="전체 조회시 입력X" style="width:150px">
     <button onclick="getLicenseHistory()">조회</button>
     <div id="license-result" class="result"></div>
 </div>
 
+
 {{-- 7. 정산 이력 조회 --}}
 <div class="section">
-    <h2>7. 정산 이력 (RoyaltyPaid 이벤트)</h2>
-    <p class="section-label">지갑 연결 불필요 | Song ID / 지갑주소 각각 또는 동시 필터 가능</p>
-    Song ID: <input type="number" id="royalty-songId" placeholder="전체 조회시 입력X" style="width:150px">
-    지갑주소: <input type="text" id="royalty-wallet" placeholder="0x... (비우면 전체)" size="42">
-    <button onclick="getRoyaltyHistory()">조회</button>
+    <h2>내 정산 이력</h2>
+    <p class="section-label">내 지갑 주소 기준 전체 조회</p>
+    <button onclick="getRoyaltyHistory()">새로고침</button>
+    <span id="refresh-result"></span>
     <div id="royalty-result" class="result"></div>
 </div>
 
 {{-- 8. 전체 곡 수 --}}
 <div class="section">
-    <h2>8. 전체 등록 곡 수 (getSongCount)</h2>
+    <h2>전체 등록 곡 수 (getSongCount)</h2>
     <p class="section-label">지갑 연결 불필요</p>
     <button onclick="getSongCount()">조회</button>
     <div id="count-result" class="result"></div>
@@ -126,6 +133,7 @@
     const CONTRACT_ADDR = '{{ config('besu.contract_address') }}';
     const CHAIN_ID      = {{ config('besu.chain_id') }};
     const RPC_URL       = '{{ config('besu.rpc_url') }}';
+    const SESSION_WALLET = "{{ session('wallet_address') }}";
 
     // 역할 상수 (컨트랙트와 동일)
     const ROLE_NAMES = {
@@ -177,9 +185,13 @@
     let walletAddress = null;
     let isConnecting  = false;
 
-    window.addEventListener('load', () => {
+    window.addEventListener('load', async () => {
         readProvider = new ethers.JsonRpcProvider(RPC_URL);
         readContract = new ethers.Contract(CONTRACT_ADDR, ABI, readProvider);
+
+        if (SESSION_WALLET) { // 내 정산이력 블록체인에서 조회
+            await getRoyaltyHistory();
+        }
     });
 
     // ── 지갑 연결 ──────────────────────────────────────
@@ -373,25 +385,24 @@
 
     // ── 7. 정산 이력 ─────────────────────────────────────
     async function getRoyaltyHistory() {
-        const songIdVal = document.getElementById('royalty-songId').value;
-        const walletVal = document.getElementById('royalty-wallet').value.trim();
+        if (!SESSION_WALLET) {
+            show('royalty-result', { error: '지갑이 연결되지 않았습니다.' }, true);
+            return;
+        }
+
         const c = contract || readContract;
         try {
-            // songId, wallet 각각 또는 동시 필터
-            const filter = c.filters.RoyaltyPaid(
-                songIdVal ? BigInt(songIdVal) : null,
-                walletVal || null
-            );
+            const filter = c.filters.RoyaltyPaid(null, SESSION_WALLET);
+            const logs   = await c.queryFilter(filter, 0, 'latest');
 
-            const logs = await c.queryFilter(filter, 0, 'latest');
             const history = logs.map(e => ({
                 songId:    e.args.songId.toString(),
-                recipient: e.args.recipient,
                 role:      ROLE_NAMES[Number(e.args.role)] ?? `역할(${e.args.role})`,
                 amount:    ethers.formatEther(e.args.amount) + ' ETH',
                 txHash:    e.transactionHash,
                 block:     e.blockNumber,
             }));
+
             show('royalty-result', { count: history.length, history });
         } catch (e) {
             show('royalty-result', { error: e.message }, true);
