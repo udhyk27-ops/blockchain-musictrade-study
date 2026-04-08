@@ -6,7 +6,7 @@ use Illuminate\Support\Facades\Route;
 
 // TEST
 Route::get('/hash-test', function() {
-    dd(bcrypt('2'), bcrypt('2'));
+    dd(bcrypt('1'), bcrypt('2'));
 });
 
 

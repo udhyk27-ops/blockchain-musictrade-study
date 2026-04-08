@@ -6,10 +6,9 @@
     <title>Music Royalty</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: Arial, sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; }
+        body { font-family: Arial, sans-serif; max-width: 1200px; margin: 40px auto; padding: 0 20px; }
         h1 { font-size: 18px; margin-bottom: 10px; }
         .wallet-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; padding: 10px; border: 1px solid #ddd; background: #f9f9f9; }
-        .wallet-address { font-size: 12px; color: #333; word-break: break-all; }
         .disconnected { color: #999; font-size: 13px; }
         .section { border: 1px solid #ddd; padding: 15px; margin-bottom: 15px; }
         h2 { font-size: 14px; margin-bottom: 10px; }
@@ -17,7 +16,6 @@
         button { padding: 6px 14px; margin: 3px; background: #fff; border: 1px solid #999; cursor: pointer; font-size: 13px; }
         button:hover { background: #eee; }
         .result { margin-top: 10px; padding: 10px; background: #f9f9f9; border: 1px solid #ddd; display: none; }
-        .error { border-color: red; background: #fff5f5; }
         pre { font-size: 12px; white-space: pre-wrap; word-break: break-all; }
         .holder-row { margin: 4px 0; }
         .section-label { font-size: 11px; color: #888; margin-bottom: 6px; }
@@ -25,108 +23,133 @@
 </head>
 <body>
 
-<h1>블록체인 테스트</h1>
+<h1 style="text-align: center; margin-bottom: 3rem;">블록체인 테스트</h1>
 
-{{-- 지갑 연결 --}}
-<div class="wallet-bar">
-    <button id="connectBtn" onclick="connectWallet()">지갑 연결</button>
-    <button id="disconnectBtn" onclick="disconnectWallet()" style="display:none">로그아웃</button>
+<div style="display: flex; gap: 20px; align-items: flex-start;">
 
-    <span id="walletStatus" class="disconnected">연결되지 않음</span>
+    {{-- 왼쪽: 지갑 불필요 --}}
+    <div style="flex: 1; display: flex; flex-direction: column; gap: 15px;">
+        <h2 style="font-size:18px; color:#888;">지갑 연결 불필요</h2>
+        {{-- 4. 곡 정보 조회 --}}
+        <div class="section">
+            <h2>곡 정보 조회 (getSongInfo)</h2>
+            <p class="section-label">지갑 연결 불필요</p>
+            Song ID: <input type="text" id="info-songId" placeholder="Song ID" style="width:80px">
+            <button onclick="getSongInfo()">조회</button>
+            <div id="info-result" class="result"></div>
+        </div>
 
-    <form method="post" action="{{ route('logout') }}">
-        @csrf
-        <button type="submit">로그아웃</button>
-    </form>
+        {{-- 5. 지분율 조회 --}}
+        <div class="section">
+            <h2>지분율 조회 (getHolders)</h2>
+            <p class="section-label">지갑 연결 불필요</p>
+            Song ID: <input type="text" id="holders-songId" placeholder="Song ID" style="width:80px">
+            <button onclick="getHolders()">조회</button>
+            <div id="holders-result" class="result"></div>
+        </div>
 
-</div>
+        {{-- 6. 라이선스 구매 이력 조회 --}}
+        <div class="section">
+            <h2>라이선스 구매 이력 (LicensePurchased 이벤트)</h2>
+            <p class="section-label">지갑 연결 불필요 | Song ID 비우면 전체 조회</p>
+            Song ID: <input type="text" id="license-songId" placeholder="전체 조회시 입력X" style="width:150px">
+            <button onclick="getLicenseHistory()">조회</button>
+            <div id="license-result" class="result"></div>
+        </div>
 
-{{-- 1. 곡 등록 --}}
-<div class="section">
-    <h2>곡 등록 (registerSong)</h2>
-    <p class="section-label">지갑 연결 필요</p>
-    <input type="text" id="reg-title" placeholder="곡 제목">
-    <button onclick="registerSong()">등록</button>
-    <div id="reg-result" class="result"></div>
-</div>
 
-{{-- 2. 지분율 설정 --}}
-<div class="section">
-    <h2>지분율 설정 (setShares)</h2>
-    <p class="section-label">지갑 연결 필요 | 곡 등록자만 가능 | 합계 100%</p>
-    Song ID: <input type="number" id="shares-songId" placeholder="Song ID" style="width:80px">
-    <div id="holders-wrap">
-        <div class="holder-row">
-            <input type="text" class="h-wallet" placeholder="지갑주소 0x..." size="42">
-            <select class="h-role">
-                <option value="1">음반 제작사</option>
-                <option value="2">작곡가</option>
-                <option value="3">작사가</option>
-                <option value="4">가수</option>
-                <option value="5">편곡자</option>
-            </select>
-            <input type="number" class="h-share" placeholder="지분%" style="width:60px">
+        {{-- 7. 정산 이력 조회 --}}
+        <div class="section">
+            <h2>내 정산 이력</h2>
+            <p class="section-label">내 지갑 주소 기준 전체 조회</p>
+            <button onclick="getRoyaltyHistory()">새로고침</button>
+            <span id="refresh-result"></span>
+            <div id="royalty-result" class="result"></div>
+        </div>
+
+        {{-- 8. 전체 곡 수 --}}
+        <div class="section">
+            <h2>전체 등록 곡 수 (getSongCount)</h2>
+            <p class="section-label">지갑 연결 불필요</p>
+            <button onclick="getSongCount()">새로고침</button>
+            <div id="count-result" class="result"></div>
         </div>
     </div>
-    <button onclick="addHolder()">+ 홀더 추가</button>
-    <button onclick="setShares()">지분율 설정</button>
-    <div id="shares-result" class="result"></div>
+
+    {{-- 구분선 --}}
+    <div style="width: 1px; background: #ddd; align-self: stretch;"></div>
+
+    {{-- 오른쪽: 지갑 필요 --}}
+    <div style="flex: 1; display: flex; flex-direction: column; gap: 15px;">
+        <h2 style="font-size:18px; color:#888;">지갑 연결 필요</h2>
+        {{-- 지갑 연결 --}}
+        <div class="wallet-bar">
+            <button id="connectBtn" onclick="connectWallet()">지갑 연결</button>
+            <button id="disconnectBtn" onclick="disconnectWallet()" style="display:none">로그아웃</button>
+
+            <span id="walletStatus" class="disconnected">연결되지 않음</span>
+
+            <form method="post" action="{{ route('logout') }}">
+                @csrf
+                <button type="submit">로그아웃</button>
+            </form>
+
+        </div>
+
+        {{-- 1. 곡 등록 --}}
+        <div class="section">
+            <h2>곡 등록 (registerSong)</h2>
+            <p class="section-label">지갑 연결 필요</p>
+            <input type="text" id="reg-title" placeholder="곡 제목">
+            <button onclick="registerSong()">등록</button>
+            <div id="reg-result" class="result"></div>
+        </div>
+
+        {{-- 2. 지분율 설정 --}}
+        <div class="section">
+            <h2>지분율 설정 (setShares)</h2>
+            <p class="section-label">지갑 연결 필요 | 곡 등록자만 가능 | 합계 100%</p>
+            Song ID: <input type="number" id="shares-songId" placeholder="Song ID" style="width:80px">
+            <div id="holders-wrap">
+                <div class="holder-row">
+                    <input type="text" class="h-wallet" placeholder="지갑주소 0x..." size="42">
+                    <select class="h-role">
+                        <option value="1">음반 제작사</option>
+                        <option value="2">작곡가</option>
+                        <option value="3">작사가</option>
+                        <option value="4">가수</option>
+                        <option value="5">편곡자</option>
+                    </select>
+                    <input type="number" class="h-share" placeholder="지분%" style="width:60px">
+                </div>
+            </div>
+            <button onclick="addHolder()">+ 홀더 추가</button>
+            <button onclick="setShares()">지분율 설정</button>
+            <div id="shares-result" class="result"></div>
+        </div>
+
+        {{-- 3. 라이선스 구매 --}}
+        <div class="section">
+            <h2>라이선스 구매 (purchaseLicense)</h2>
+            <p class="section-label">지갑 연결 필요 | 구매 즉시 권리자에게 자동 정산</p>
+            Song ID: <input type="number" id="buy-songId" placeholder="Song ID" style="width:80px">
+            금액(ETH): <input type="number" id="buy-amount" value="0.01" step="0.001" style="width:80px">
+            <button onclick="purchaseLicense()">구매</button>
+            <div id="buy-result" class="result"></div>
+        </div>
+    </div>
+
 </div>
 
-{{-- 3. 라이선스 구매 --}}
-<div class="section">
-    <h2>라이선스 구매 (purchaseLicense)</h2>
-    <p class="section-label">지갑 연결 필요 | 구매 즉시 권리자에게 자동 정산</p>
-    Song ID: <input type="number" id="buy-songId" placeholder="Song ID" style="width:80px">
-    금액(ETH): <input type="number" id="buy-amount" value="0.01" step="0.001" style="width:80px">
-    <button onclick="purchaseLicense()">구매</button>
-    <div id="buy-result" class="result"></div>
-</div>
-
-{{-- 4. 곡 정보 조회 --}}
-<div class="section">
-    <h2>곡 정보 조회 (getSongInfo)</h2>
-    <p class="section-label">지갑 연결 불필요</p>
-    Song ID: <input type="number" id="info-songId" placeholder="Song ID" style="width:80px">
-    <button onclick="getSongInfo()">조회</button>
-    <div id="info-result" class="result"></div>
-</div>
-
-{{-- 5. 지분율 조회 --}}
-<div class="section">
-    <h2>지분율 조회 (getHolders)</h2>
-    <p class="section-label">지갑 연결 불필요</p>
-    Song ID: <input type="number" id="holders-songId" placeholder="Song ID" style="width:80px">
-    <button onclick="getHolders()">조회</button>
-    <div id="holders-result" class="result"></div>
-</div>
-
-{{-- 6. 라이선스 구매 이력 조회 --}}
-<div class="section">
-    <h2>라이선스 구매 이력 (LicensePurchased 이벤트)</h2>
-    <p class="section-label">지갑 연결 불필요 | Song ID 비우면 전체 조회</p>
-    Song ID: <input type="number" id="license-songId" placeholder="전체 조회시 입력X" style="width:150px">
-    <button onclick="getLicenseHistory()">조회</button>
-    <div id="license-result" class="result"></div>
-</div>
 
 
-{{-- 7. 정산 이력 조회 --}}
-<div class="section">
-    <h2>내 정산 이력</h2>
-    <p class="section-label">내 지갑 주소 기준 전체 조회</p>
-    <button onclick="getRoyaltyHistory()">새로고침</button>
-    <span id="refresh-result"></span>
-    <div id="royalty-result" class="result"></div>
-</div>
 
-{{-- 8. 전체 곡 수 --}}
-<div class="section">
-    <h2>전체 등록 곡 수 (getSongCount)</h2>
-    <p class="section-label">지갑 연결 불필요</p>
-    <button onclick="getSongCount()">조회</button>
-    <div id="count-result" class="result"></div>
-</div>
+
+
+
+
+
+
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
 <script>
@@ -192,6 +215,8 @@
         if (SESSION_WALLET) { // 내 정산이력 블록체인에서 조회
             await getRoyaltyHistory();
         }
+
+        await getSongCount();
     });
 
     // ── 지갑 연결 ──────────────────────────────────────
