@@ -25,5 +25,7 @@ Route::middleware('auth')->group(function() {
     Route::post('/encode-register',   [Controller::class, 'encodeRegister']);
     Route::post('/encode-set-shares', [Controller::class, 'encodeSetShares']);
     Route::post('/encode-purchase',   [Controller::class, 'encodePurchase']);
+
+    Route::post('/wallet/update', [Controller::class, 'updateWallet'])->name('update.wallet'); // 사용자 지갑주소 업데이트
 });
 

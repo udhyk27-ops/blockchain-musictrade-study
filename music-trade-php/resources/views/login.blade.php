@@ -11,19 +11,52 @@
     <meta http-equiv="Expires" content="0">
 
     <title>MusicTrade</title>
-    <link href="{{ asset('css/login.css') }}" rel="stylesheet">
+{{--    <link href="{{ asset('css/login.css') }}" rel="stylesheet">--}}
+    <style>
+        body {
+            margin: 0;
+            height: 100vh;
+        }
 
+        * {
+            box-sizing: border-box;
+        }
+
+        .wrapper {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100%;
+            padding: 20px;
+        }
+
+        .login {
+            width: 500px;
+        }
+
+        .login input {
+            padding: 15px 10px;
+            margin-bottom: 10px;
+            width: 100%;
+        }
+
+        .login button {
+            width: 100%;
+            height: 50px;
+        }
+
+    </style>
 </head>
 <body>
 
 <div class="wrapper">
     <form class="login" action="{{ route('login.store') }}" method="post">
         @csrf
-        <p class="title">블록체인 음악 저작권 정산 시스템</p>
+        <h1>블록체인 음악 저작권 정산 시스템</h1>
         <input type="text" name="user_id" placeholder="아이디" value="{{ old('user_id') }}" required/>
         <input type="password" name="user_pwd" placeholder="비밀번호" autocomplete="off" required/>
         <button type="submit">
-            <span class="state">LOGIN</span>
+            <span class="state"><b>LOGIN</b></span>
         </button>
     </form>
 </div>

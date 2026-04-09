@@ -4,6 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Services\ContractService;
 use Illuminate\Http\Request;
+use App\Models\User;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class Controller
 {
@@ -28,11 +31,14 @@ class Controller
             $error = $e->getMessage();
         }
 
+        // 지분율 설정 - 유저 목록 DB 조회
+        $users = User::whereNotNull('F_WALLET_ADDRESS')->get();
+
         return view('index', [
-            'songCount
-            '       => $songCount,
+            'songCount'       => $songCount,
             'contractAddress' => config('besu.contract_address'),
             'chainId'         => config('besu.chain_id'),
+            'users'           => $users,
             'error'           => $error,
         ]);
     }
@@ -107,5 +113,17 @@ class Controller
         } catch (\Exception $e) {
             return response()->json(['success' => false, 'message' => $e->getMessage()]);
         }
+    }
+
+    public function updateWallet(Request $request)
+    {
+        $request->validate(['wallet_address' => ['required', 'string', 'size:42']]);
+
+        DB::table('T_USER')
+            ->where('F_ID', Auth::user()->f_id)
+            ->update(['F_WALLET_ADDRESS' => $request->wallet_address]);
+
+        session(['wallet_address' => $request->wallet_address]); // 세션에 다시 저장
+        return response()->json(['success' => true]);
     }
 }

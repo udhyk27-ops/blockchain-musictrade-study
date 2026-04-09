@@ -15,6 +15,7 @@
         input, select { padding: 6px 8px; margin: 3px; border: 1px solid #ccc; font-size: 13px; }
         button { padding: 6px 14px; margin: 3px; background: #fff; border: 1px solid #999; cursor: pointer; font-size: 13px; }
         button:hover { background: #eee; }
+        button:disabled { background: #eee; color: #aaa; cursor: not-allowed; }
         .result { margin-top: 10px; padding: 10px; background: #f9f9f9; border: 1px solid #ddd; display: none; }
         pre { font-size: 12px; white-space: pre-wrap; word-break: break-all; }
         .holder-row { margin: 4px 0; }
@@ -23,13 +24,22 @@
 </head>
 <body>
 
-<h1 style="text-align: center; margin-bottom: 3rem;">블록체인 테스트</h1>
+<h1 style="text-align: center;">블록체인 테스트</h1>
+
+<div style="margin-bottom: 3rem; display: flex; justify-content: right; gap: 2.0rem; align-items:center;">
+    <div><b>로그인 정보:</b> {{ Auth::user()->f_id }} <br/> <b>지갑주소 :</b> <span id="user-wallet-address">{{ Auth::user()->f_wallet_address ?? '지갑 정보없음' }}</span></div>
+    <form method="post" action="{{ route('logout') }}">
+        @csrf
+        <button type="submit">로그아웃</button>
+    </form>
+</div>
 
 <div style="display: flex; gap: 20px; align-items: flex-start;">
 
     {{-- 왼쪽: 지갑 불필요 --}}
     <div style="flex: 1; display: flex; flex-direction: column; gap: 15px;">
         <h2 style="font-size:18px; color:#888;">지갑 연결 불필요</h2>
+
         {{-- 4. 곡 정보 조회 --}}
         <div class="section">
             <h2>곡 정보 조회 (getSongInfo)</h2>
@@ -57,7 +67,6 @@
             <div id="license-result" class="result"></div>
         </div>
 
-
         {{-- 7. 정산 이력 조회 --}}
         <div class="section">
             <h2>내 정산 이력</h2>
@@ -82,18 +91,12 @@
     {{-- 오른쪽: 지갑 필요 --}}
     <div style="flex: 1; display: flex; flex-direction: column; gap: 15px;">
         <h2 style="font-size:18px; color:#888;">지갑 연결 필요</h2>
+
         {{-- 지갑 연결 --}}
         <div class="wallet-bar">
             <button id="connectBtn" onclick="connectWallet()">지갑 연결</button>
             <button id="disconnectBtn" onclick="disconnectWallet()" style="display:none">로그아웃</button>
-
             <span id="walletStatus" class="disconnected">연결되지 않음</span>
-
-            <form method="post" action="{{ route('logout') }}">
-                @csrf
-                <button type="submit">로그아웃</button>
-            </form>
-
         </div>
 
         {{-- 1. 곡 등록 --}}
@@ -101,7 +104,7 @@
             <h2>곡 등록 (registerSong)</h2>
             <p class="section-label">지갑 연결 필요</p>
             <input type="text" id="reg-title" placeholder="곡 제목">
-            <button onclick="registerSong()">등록</button>
+            <button onclick="registerSong(event)">등록</button>
             <div id="reg-result" class="result"></div>
         </div>
 
@@ -112,7 +115,11 @@
             Song ID: <input type="number" id="shares-songId" placeholder="Song ID" style="width:80px">
             <div id="holders-wrap">
                 <div class="holder-row">
-                    <input type="text" class="h-wallet" placeholder="지갑주소 0x..." size="42">
+                    <select class="h-wallet">
+                        @foreach($users as $user)
+                            <option value="{{ $user->f_wallet_address }}">{{ $user->f_id }}</option>
+                        @endforeach
+                    </select>
                     <select class="h-role">
                         <option value="1">음반 제작사</option>
                         <option value="2">작곡가</option>
@@ -124,7 +131,7 @@
                 </div>
             </div>
             <button onclick="addHolder()">+ 홀더 추가</button>
-            <button onclick="setShares()">지분율 설정</button>
+            <button onclick="setShares(event)">지분율 설정</button>
             <div id="shares-result" class="result"></div>
         </div>
 
@@ -133,32 +140,21 @@
             <h2>라이선스 구매 (purchaseLicense)</h2>
             <p class="section-label">지갑 연결 필요 | 구매 즉시 권리자에게 자동 정산</p>
             Song ID: <input type="number" id="buy-songId" placeholder="Song ID" style="width:80px">
-            금액(ETH): <input type="number" id="buy-amount" value="0.01" step="0.001" style="width:80px">
-            <button onclick="purchaseLicense()">구매</button>
+            금액(AID): <input type="number" id="buy-amount" value="0.01" step="0.001" style="width:80px">
+            <button onclick="purchaseLicense(event)">구매</button>
             <div id="buy-result" class="result"></div>
         </div>
     </div>
 
 </div>
 
-
-
-
-
-
-
-
-
-
-
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
 <script>
     const CONTRACT_ADDR = '{{ config('besu.contract_address') }}';
     const CHAIN_ID      = {{ config('besu.chain_id') }};
     const RPC_URL       = '{{ config('besu.rpc_url') }}';
-    const SESSION_WALLET = "{{ session('wallet_address') }}";
+    let currentWallet = "{{ session('wallet_address') }}";
 
-    // 역할 상수 (컨트랙트와 동일)
     const ROLE_NAMES = {
         1: '음반 제작사',
         2: '작곡가',
@@ -187,7 +183,6 @@
             outputs: [] },
         { name: 'purchaseLicense', type: 'function', stateMutability: 'payable',
             inputs: [{ name: 'songId', type: 'uint256' }], outputs: [] },
-        // 이벤트
         { name: 'LicensePurchased', type: 'event',
             inputs: [{ name: 'songId',    type: 'uint256', indexed: true },
                 { name: 'buyer',     type: 'address', indexed: true },
@@ -208,16 +203,38 @@
     let walletAddress = null;
     let isConnecting  = false;
 
+    // ── 페이지 로드 ───────────────────────────────────────
     window.addEventListener('load', async () => {
         readProvider = new ethers.JsonRpcProvider(RPC_URL);
         readContract = new ethers.Contract(CONTRACT_ADDR, ABI, readProvider);
 
-        if (SESSION_WALLET) { // 내 정산이력 블록체인에서 조회
-            await getRoyaltyHistory();
-        }
-
+        if (currentWallet) await getRoyaltyHistory();
         await getSongCount();
+
+        console.log('세션 지갑주소1: ' + currentWallet);
+
+        // ✅ 이벤트 리스너는 load에서 딱 1회만 등록
+        if (window.ethereum) {
+            window.ethereum.on('accountsChanged', () => disconnectWallet());
+            window.ethereum.on('chainChanged',    () => location.reload());
+        }
     });
+
+    // ── 공통 유틸 ─────────────────────────────────────────
+    function show(id, data, isError = false) {
+        const el = document.getElementById(id);
+        el.style.display = 'block';
+        el.className = 'result' + (isError ? ' error' : '');
+        el.innerHTML = '<pre>' + JSON.stringify(data, (k, v) =>
+            typeof v === 'bigint' ? v.toString() : v, 2) + '</pre>';
+    }
+
+    // ✅ 버튼 비활성화/복원 헬퍼
+    function setLoading(btnEl, loading) {
+        btnEl.disabled = loading;
+        btnEl.dataset.originalText = btnEl.dataset.originalText ?? btnEl.textContent;
+        btnEl.textContent = loading ? '처리중...' : btnEl.dataset.originalText;
+    }
 
     // ── 지갑 연결 ──────────────────────────────────────
     async function connectWallet() {
@@ -226,23 +243,66 @@
         isConnecting = true;
         try {
             provider = new ethers.BrowserProvider(window.ethereum);
+
+            // 변경: 네트워크 전환 시도 → 없으면 자동 추가
             try {
                 await provider.send('wallet_switchEthereumChain',
                     [{ chainId: '0x' + CHAIN_ID.toString(16) }]);
-            } catch (e) {
-                alert('MetaMask에서 Besu 네트워크로 전환해주세요! (Chain ID: ' + CHAIN_ID + ')');
-                return;
+            } catch (switchError) {
+                if (switchError.code === 4902) {
+                    // 네트워크가 MetaMask에 없을 때 → 자동 추가
+                    await provider.send('wallet_addEthereumChain', [{
+                        chainId:        '0x' + CHAIN_ID.toString(16),
+                        chainName:      'Music Royalty Network',
+                        nativeCurrency: {
+                            name:     'AID',
+                            symbol:   'AID',
+                            decimals: 18,
+                        },
+                        rpcUrls: [RPC_URL],
+                    }]);
+                } else {
+                    // 그 외 에러 (사용자가 팝업 거절 등)
+                    alert('네트워크 전환 실패: ' + switchError.message);
+                    return;
+                }
             }
+
             await provider.send('wallet_requestPermissions', [{ eth_accounts: {} }]);
             signer        = await provider.getSigner();
             walletAddress = await signer.getAddress();
             contract      = new ethers.Contract(CONTRACT_ADDR, ABI, signer);
 
-            document.getElementById('walletStatus').textContent = walletAddress;
-            document.getElementById('walletStatus').className   = 'wallet-address';
-            document.getElementById('connectBtn').textContent   = '연결됨';
-            document.getElementById('connectBtn').disabled      = true;
+            // 세션 지갑주소와 다르면 DB 업데이트
+            if (currentWallet.toLowerCase() !== walletAddress.toLowerCase()) {
+                const res = await fetch('{{ route("update.wallet") }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                    },
+                    body: JSON.stringify({ wallet_address: walletAddress }),
+                });
+                const data = await res.json();
+                if (data.success === true) {
+                    currentWallet = walletAddress;
+                    document.getElementById('user-wallet-address').textContent = walletAddress;
+                    console.log('지갑주소 업데이트 성공');
+                } else {
+                    alert('지갑주소 업데이트 실패');
+                    return;
+                }
+            }
+
+            document.getElementById('walletStatus').textContent    = walletAddress;
+            document.getElementById('walletStatus').className      = 'wallet-address';
+            document.getElementById('connectBtn').textContent      = '연결됨';
+            document.getElementById('connectBtn').disabled         = true;
             document.getElementById('disconnectBtn').style.display = 'inline';
+
+            console.log('세션 지갑주소: ' + currentWallet);
+            console.log('MetaMask 지갑주소: ' + walletAddress);
+
         } catch (e) {
             alert('지갑 연결 실패: ' + e.message);
         } finally {
@@ -260,40 +320,42 @@
     }
 
     function checkWallet() {
-        if (!contract) { alert('먼저 지갑을 연결해주세요!'); return false; }
+        if (!contract) { alert('지갑을 연결해주세요!!!'); return false; }
         return true;
     }
 
-    function show(id, data, isError = false) {
-        const el = document.getElementById(id);
-        el.style.display = 'block';
-        el.className = 'result' + (isError ? ' error' : '');
-        el.innerHTML = '<pre>' + JSON.stringify(data, (k, v) =>
-            typeof v === 'bigint' ? v.toString() : v, 2) + '</pre>';
-    }
-
     // ── 1. 곡 등록 ──────────────────────────────────────
-    async function registerSong() {
+    async function registerSong(e) {
         if (!checkWallet()) return;
         const title = document.getElementById('reg-title').value.trim();
         if (!title) { alert('제목을 입력하세요.'); return; }
+
+        const btn = e.currentTarget;       // 클릭된 버튼 참조
+        setLoading(btn, true);
         try {
             const tx = await contract.registerSong(title);
             show('reg-result', { status: '트랜잭션 전송됨', txHash: tx.hash });
             const receipt = await tx.wait();
             const songId  = parseInt(receipt.logs[0].topics[1], 16);
-            show('reg-result', { status: '완료', txHash: tx.hash, songId });
-        } catch (e) {
-            show('reg-result', { error: e.message }, true);
+            show('reg-result', { status: '완료', txHash: tx.hash, songId }); // 오타 수정
+        } catch (err) {
+            show('reg-result', { error: err.message }, true);
+        } finally {
+            setLoading(btn, false);        // 성공/실패 모두 복원
         }
     }
 
     // ── 2. 홀더 추가 ────────────────────────────────────
     function addHolder() {
+        const userOptions = `
+        @foreach($users as $user)
+        <option value="{{ $user->f_wallet_address }}">{{ $user->f_id }}</option>
+        @endforeach
+        `;
         const div = document.createElement('div');
         div.className = 'holder-row';
         div.innerHTML = `
-            <input type="text" class="h-wallet" placeholder="지갑주소 0x..." size="42">
+            <select class="h-wallet">${userOptions}</select>
             <select class="h-role">
                 <option value="1">음반 제작사</option>
                 <option value="2">작곡가</option>
@@ -302,47 +364,58 @@
                 <option value="5">편곡자</option>
             </select>
             <input type="number" class="h-share" placeholder="지분%" style="width:60px">
-            <button onclick="this.parentElement.remove()">삭제</button>`;
+            <button onclick="this.parentElement.remove()">삭제</button>
+        `;
         document.getElementById('holders-wrap').appendChild(div);
     }
 
     // ── 2. 지분율 설정 ───────────────────────────────────
-    async function setShares() {
+    async function setShares(e) {
         if (!checkWallet()) return;
         const songId  = parseInt(document.getElementById('shares-songId').value);
-        const wallets = [...document.querySelectorAll('.h-wallet')].map(e => e.value.trim());
-        const roles   = [...document.querySelectorAll('.h-role')].map(e => parseInt(e.value));
-        const shares  = [...document.querySelectorAll('.h-share')].map(e => parseInt(e.value));
+        const wallets = [...document.querySelectorAll('.h-wallet')].map(el => el.value.trim());
+        const roles   = [...document.querySelectorAll('.h-role')].map(el => parseInt(el.value));
+        const shares  = [...document.querySelectorAll('.h-share')].map(el => parseInt(el.value));
+
         if (!songId)               { alert('Song ID를 입력하세요.'); return; }
         if (wallets.some(w => !w)) { alert('지갑 주소를 모두 입력하세요.'); return; }
         if (shares.some(s => isNaN(s) || s <= 0)) { alert('지분율을 모두 입력하세요.'); return; }
         if (shares.reduce((a, b) => a + b, 0) !== 100) { alert('지분율 합계가 100이어야 합니다.'); return; }
 
-        // 사용자 입력 100 기준 → 컨트랙트 10000 기준 변환
         const shares10000 = shares.map(s => s * 100);
+
+        const btn = e.currentTarget;
+        setLoading(btn, true);
         try {
             const tx = await contract.setShares(songId, wallets, roles, shares10000);
             show('shares-result', { status: '트랜잭션 전송됨', txHash: tx.hash });
             await tx.wait();
             show('shares-result', { status: '완료', txHash: tx.hash });
-        } catch (e) {
-            show('shares-result', { error: e.message }, true);
+        } catch (err) {
+            show('shares-result', { error: err.message }, true);
+        } finally {
+            setLoading(btn, false);
         }
     }
 
     // ── 3. 라이선스 구매 ─────────────────────────────────
-    async function purchaseLicense() {
+    async function purchaseLicense(e) {
         if (!checkWallet()) return;
         const songId = parseInt(document.getElementById('buy-songId').value);
         const eth    = document.getElementById('buy-amount').value;
         if (!songId) { alert('Song ID를 입력하세요.'); return; }
+
+        const btn = e.currentTarget;
+        setLoading(btn, true);
         try {
             const tx = await contract.purchaseLicense(songId, { value: ethers.parseEther(eth) });
             show('buy-result', { status: '트랜잭션 전송됨', txHash: tx.hash });
             await tx.wait();
-            show('buy-result', { status: '완료', txHash: tx.hash, buyer: walletAddress, amount: eth + ' ETH' });
-        } catch (e) {
-            show('buy-result', { error: e.message }, true);
+            show('buy-result', { status: '완료', txHash: tx.hash, buyer: walletAddress, amount: eth + ' AID' });
+        } catch (err) {
+            show('buy-result', { error: err.message }, true);
+        } finally {
+            setLoading(btn, false);
         }
     }
 
@@ -357,7 +430,7 @@
                 title:        res.title,
                 producer:     res.producer,
                 active:       res.active,
-                totalRevenue: ethers.formatEther(res.totalRevenue) + ' ETH',
+                totalRevenue: ethers.formatEther(res.totalRevenue) + ' AID',
                 holderCount:  res.holderCount.toString(),
             });
         } catch (e) {
@@ -375,7 +448,7 @@
             const holders = res.wallets.map((w, i) => ({
                 wallet: w,
                 role:   ROLE_NAMES[Number(res.roles[i])] ?? `역할(${res.roles[i]})`,
-                share:  (Number(res.shares[i]) / 100) + '%',  // 10000 → 100 기준 표시
+                share:  (Number(res.shares[i]) / 100) + '%',
             }));
             show('holders-result', { holders });
         } catch (e) {
@@ -388,16 +461,14 @@
         const songIdVal = document.getElementById('license-songId').value;
         const c = contract || readContract;
         try {
-            // songId 필터 (비어있으면 전체 조회)
             const filter = songIdVal
                 ? c.filters.LicensePurchased(BigInt(songIdVal), null)
                 : c.filters.LicensePurchased();
-
             const logs = await c.queryFilter(filter, 0, 'latest');
             const history = logs.map(e => ({
                 songId:    e.args.songId.toString(),
                 buyer:     e.args.buyer,
-                amount:    ethers.formatEther(e.args.amount) + ' ETH',
+                amount:    ethers.formatEther(e.args.amount) + ' AID',
                 timestamp: new Date(Number(e.args.timestamp) * 1000).toLocaleString(),
                 txHash:    e.transactionHash,
                 block:     e.blockNumber,
@@ -410,24 +481,21 @@
 
     // ── 7. 정산 이력 ─────────────────────────────────────
     async function getRoyaltyHistory() {
-        if (!SESSION_WALLET) {
+        if (!currentWallet) {
             show('royalty-result', { error: '지갑이 연결되지 않았습니다.' }, true);
             return;
         }
-
         const c = contract || readContract;
         try {
-            const filter = c.filters.RoyaltyPaid(null, SESSION_WALLET);
+            const filter = c.filters.RoyaltyPaid(null, currentWallet);
             const logs   = await c.queryFilter(filter, 0, 'latest');
-
             const history = logs.map(e => ({
-                songId:    e.args.songId.toString(),
-                role:      ROLE_NAMES[Number(e.args.role)] ?? `역할(${e.args.role})`,
-                amount:    ethers.formatEther(e.args.amount) + ' ETH',
-                txHash:    e.transactionHash,
-                block:     e.blockNumber,
+                songId: e.args.songId.toString(),
+                role:   ROLE_NAMES[Number(e.args.role)] ?? `역할(${e.args.role})`,
+                amount: ethers.formatEther(e.args.amount) + ' AID',
+                txHash: e.transactionHash,
+                block:  e.blockNumber,
             }));
-
             show('royalty-result', { count: history.length, history });
         } catch (e) {
             show('royalty-result', { error: e.message }, true);
