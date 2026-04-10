@@ -58,16 +58,6 @@ class BesuService
     }
 
     /**
-     * 계정 잔액 조회 (ETH 단위 반환)
-     */
-    public function getBalance(string $address): string
-    {
-        $hex = $this->call('eth_getBalance', [$address, 'latest']);
-        $wei = hexdec($hex);
-        return bcdiv((string) $wei, bcpow('10', '18', 0), 6); // wei → ETH
-    }
-
-    /**
      * eth_call (읽기 전용 컨트랙트 호출)
      */
     public function ethCall(string $to, string $data, string $from = null): string

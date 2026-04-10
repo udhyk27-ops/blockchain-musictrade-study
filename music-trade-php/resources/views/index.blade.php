@@ -132,9 +132,8 @@
         {{-- 라이선스 구매 --}}
         <div class="section">
             <h2>라이선스 구매 (purchaseLicense)</h2>
-            <p class="section-label">구매 즉시 권리자에게 자동 정산</p>
+            <p class="section-label">구매 즉시 블록체인에 기록</p>
             Song ID: <input type="number" id="buy-songId" placeholder="Song ID" style="width:80px">
-            금액(AID): <input type="number" id="buy-amount" value="0.01" step="0.001" style="width:80px">
             <button onclick="purchaseLicense(event)">구매</button>
             <div id="buy-result" class="result"></div>
         </div>
@@ -262,17 +261,12 @@
     // ── 3. 라이선스 구매 ─────────────────────────────
     async function purchaseLicense(e) {
         const songId = parseInt(document.getElementById('buy-songId').value);
-        const amount = document.getElementById('buy-amount').value;
         if (!songId) { alert('Song ID를 입력하세요.'); return; }
-        if (!amount || parseFloat(amount) <= 0) { alert('금액을 입력하세요.'); return; }
 
         const btn = e.currentTarget;
         setLoading(btn, true);
         try {
-            const data = await apiFetch('{{ route("song.purchase") }}', 'POST', {
-                song_id: songId,
-                amount,
-            });
+            const data = await apiFetch('{{ route("song.purchase") }}', 'POST', { song_id: songId });
             show('buy-result', data, !data.success);
         } catch (err) {
             show('buy-result', { error: err.message }, true);

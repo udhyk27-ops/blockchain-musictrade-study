@@ -16,8 +16,15 @@ class WalletService
     }
 
     /**
-     * 새 Ethereum 지갑 생성
-     * 개인키 → secp256k1 공개키 → keccak256 → 주소 도출
+     * 새 사용자 지갑 생성
+     * Ethereum 규격에 맞는 개인키 & 공개키 & 주소 생성
+     *
+     * 개인키 = 32바이트 랜덤 숫자 - (secp256k1 공개키 → keccak256 → 주소 도출)
+     * 공개키 = secp256k1 타원곡선으로 개인키에서 도출 - 여기서만 쓰이고 버림
+     * 주소 = 공개키를 keccak256 해시한 뒤 마지막 20바이트 앞에 0x 붙인 것
+     *
+     * Besu가 트랜잭션을 받으면 서명에서 공개키를 역산해서 주소를 검증하기 때문에 공개키로 주소를 도출해서 DB저장이 필요함
+     *
      * 개인키는 Laravel encrypt()로 암호화하여 반환
      *
      * @return array{address: string, encrypted_private_key: string}
