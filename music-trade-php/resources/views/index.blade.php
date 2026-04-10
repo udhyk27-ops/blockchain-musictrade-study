@@ -150,6 +150,11 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
 <script>
+    /**
+     * 조회 기능은 지갑 거치지 않고 바로 Besu 네트워크 호출
+     * window.ethereum → MetaMask
+     */
+
     const CONTRACT_ADDR = '{{ config('besu.contract_address') }}';
     const CHAIN_ID      = {{ config('besu.chain_id') }};
     const RPC_URL       = '{{ config('besu.rpc_url') }}';
@@ -239,6 +244,7 @@
     // ── 지갑 연결 ──────────────────────────────────────
     async function connectWallet() {
         if (typeof window.ethereum === 'undefined') { alert('MetaMask를 설치해주세요!'); return; }
+
         if (isConnecting) { alert('MetaMask 팝업이 이미 열려있습니다.'); return; }
         isConnecting = true;
         try {
@@ -272,6 +278,12 @@
             signer        = await provider.getSigner();
             walletAddress = await signer.getAddress();
             contract      = new ethers.Contract(CONTRACT_ADDR, ABI, signer);
+
+            // 주소 형식 검증
+            if (!/^0x[0-9a-fA-F]{40}$/.test(walletAddress)) {
+                alert('유효하지 않은 지갑 주소입니다.');
+                return;
+            }
 
             // 세션 지갑주소와 다르면 DB 업데이트
             if (currentWallet.toLowerCase() !== walletAddress.toLowerCase()) {

@@ -117,7 +117,9 @@ class Controller
 
     public function updateWallet(Request $request)
     {
-        $request->validate(['wallet_address' => ['required', 'string', 'size:42']]);
+        $request->validate([
+            'wallet_address' => ['required', 'string', 'regex:/^0x[0-9a-fA-F]{40}$/', 'unique:t_user,f_wallet_address,' . Auth::id() . ',f_id'],
+        ]);
 
         DB::table('T_USER')
             ->where('F_ID', Auth::user()->f_id)
