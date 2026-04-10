@@ -10,6 +10,7 @@
         "kornrunner/keccak": "^1.1",
         "laravel/framework": "^13.0",
         "laravel/tinker": "^3.0",
+        "web3p/ethereum-tx": "^0.4.3",
         "web3p/web3.php": "^0.1.6",
         "yajra/laravel-oci8": "^13.0"
     },
