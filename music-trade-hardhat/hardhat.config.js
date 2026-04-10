@@ -8,8 +8,7 @@ module.exports = {
       url: process.env.BESU_RPC_URL,
       chainId: 1337,
       accounts: [process.env.DEPLOYER_PRIVATE_KEY],
-      gasPrice: 1000,
-      gas: 6000000,
+      gasPrice: 0,
     },
   },
 };

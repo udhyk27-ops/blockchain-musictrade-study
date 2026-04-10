@@ -17,16 +17,8 @@ use Illuminate\Support\Facades\Log;
 
 class Controller
 {
-    protected ContractService $contract;
-    protected BesuService     $besu;
-    protected WalletService   $wallet;
-
-    public function __construct(ContractService $contract, BesuService $besu, WalletService $wallet)
-    {
-        $this->contract = $contract;
-        $this->besu     = $besu;
-        $this->wallet   = $wallet;
-    }
+    // 블록체인 서비스는 TX 라우트에서만 메서드 인젝션으로 사용
+    // → DB 조회 라우트에서 Besu 연결 시도 없음 (지연 없음)
 
     // ──────────────────────────────────────────────────
     // 대시보드
@@ -35,9 +27,7 @@ class Controller
     public function index()
     {
         $songCount = Song::count();
-
-        // 지분율 설정용 사용자 목록 (지갑주소 보유자)
-        $users = User::whereNotNull('F_WALLET_ADDRESS')->get();
+        $users     = User::whereNotNull('F_WALLET_ADDRESS')->get();
 
         return view('index', [
             'songCount' => $songCount,
@@ -49,11 +39,11 @@ class Controller
     // 공통 유틸: receipt 폴링 (최대 $maxWait초 대기)
     // ──────────────────────────────────────────────────
 
-    private function waitForReceipt(string $txHash, int $maxWait = 30): ?array
+    private function waitForReceipt(BesuService $besu, string $txHash, int $maxWait = 30): ?array
     {
         $deadline = time() + $maxWait;
         while (time() < $deadline) {
-            $receipt = $this->besu->getTransactionReceipt($txHash);
+            $receipt = $besu->getTransactionReceipt($txHash);
             if ($receipt !== null) {
                 return $receipt;
             }
@@ -81,10 +71,10 @@ class Controller
     /**
      * 기본 TX 파라미터 구성
      */
-    private function buildTxParams(string $from, string $calldata, string $value = '0x0', int $gas = 300000): array
+    private function buildTxParams(BesuService $besu, string $from, string $calldata, string $value = '0x0', int $gas = 300000): array
     {
-        $nonce    = $this->besu->getNonce($from);
-        $gasPrice = $this->besu->getGasPrice();
+        $nonce    = $besu->getNonce($from);
+        $gasPrice = $besu->getGasPrice();
 
         return [
             'nonce'    => '0x' . dechex($nonce),
@@ -102,18 +92,18 @@ class Controller
     // 1. 곡 등록 (서버 사이드 서명 + DB 저장)
     // ──────────────────────────────────────────────────
 
-    public function registerSong(Request $request)
+    public function registerSong(Request $request, ContractService $contract, BesuService $besu, WalletService $wallet)
     {
         $request->validate(['title' => 'required|string|max:200']);
 
         try {
             $w        = $this->getUserWallet();
-            $calldata = $this->contract->encodeRegisterSong($request->title);
-            $txParams = $this->buildTxParams($w['address'], $calldata);
-            $signedTx = $this->wallet->signTransaction($w['encrypted_key'], $txParams);
-            $txHash   = $this->besu->sendRawTransaction($signedTx);
+            $calldata = $contract->encodeRegisterSong($request->title);
+            $txParams = $this->buildTxParams($besu, $w['address'], $calldata);
+            $signedTx = $wallet->signTransaction($w['encrypted_key'], $txParams);
+            $txHash   = $besu->sendRawTransaction($signedTx);
 
-            $receipt = $this->waitForReceipt($txHash);
+            $receipt = $this->waitForReceipt($besu, $txHash);
             if (!$receipt || ($receipt['status'] ?? '0x0') !== '0x1') {
                 return response()->json(['success' => false, 'message' => '트랜잭션이 실패했습니다.']);
             }
@@ -149,7 +139,7 @@ class Controller
     // 2. 지분율 설정 (서버 사이드 서명 + DB 저장)
     // ──────────────────────────────────────────────────
 
-    public function setShares(Request $request)
+    public function setShares(Request $request, ContractService $contract, BesuService $besu, WalletService $wallet)
     {
         $request->validate([
             'song_id'  => 'required|integer|min:1',
@@ -189,14 +179,14 @@ class Controller
                 $shares[]  = (int) $h['share'];
             }
 
-            $calldata = $this->contract->encodeSetShares(
+            $calldata = $contract->encodeSetShares(
                 $request->song_id, $wallets, $roles, $shares
             );
-            $txParams = $this->buildTxParams($w['address'], $calldata);
-            $signedTx = $this->wallet->signTransaction($w['encrypted_key'], $txParams);
-            $txHash   = $this->besu->sendRawTransaction($signedTx);
+            $txParams = $this->buildTxParams($besu, $w['address'], $calldata);
+            $signedTx = $wallet->signTransaction($w['encrypted_key'], $txParams);
+            $txHash   = $besu->sendRawTransaction($signedTx);
 
-            $receipt = $this->waitForReceipt($txHash);
+            $receipt = $this->waitForReceipt($besu, $txHash);
             if (!$receipt || ($receipt['status'] ?? '0x0') !== '0x1') {
                 return response()->json(['success' => false, 'message' => '트랜잭션이 실패했습니다.']);
             }
@@ -238,7 +228,7 @@ class Controller
     // 3. 라이선스 구매 (서버 사이드 서명 + DB 저장)
     // ──────────────────────────────────────────────────
 
-    public function purchaseLicense(Request $request)
+    public function purchaseLicense(Request $request, ContractService $contract, BesuService $besu, WalletService $wallet)
     {
         $request->validate([
             'song_id' => 'required|integer|min:1',
@@ -253,12 +243,12 @@ class Controller
             $amountWei = bcmul($amountEth, bcpow('10', '18', 0), 0);
             $valueHex  = '0x' . base_convert($amountWei, 10, 16);
 
-            $calldata = $this->contract->encodePurchaseLicense($request->song_id);
-            $txParams = $this->buildTxParams($w['address'], $calldata, $valueHex, 500000);
-            $signedTx = $this->wallet->signTransaction($w['encrypted_key'], $txParams);
-            $txHash   = $this->besu->sendRawTransaction($signedTx);
+            $calldata = $contract->encodePurchaseLicense($request->song_id);
+            $txParams = $this->buildTxParams($besu, $w['address'], $calldata, $valueHex, 500000);
+            $signedTx = $wallet->signTransaction($w['encrypted_key'], $txParams);
+            $txHash   = $besu->sendRawTransaction($signedTx);
 
-            $receipt = $this->waitForReceipt($txHash, 60);
+            $receipt = $this->waitForReceipt($besu, $txHash, 60);
             if (!$receipt || ($receipt['status'] ?? '0x0') !== '0x1') {
                 return response()->json(['success' => false, 'message' => '트랜잭션이 실패했습니다.']);
             }

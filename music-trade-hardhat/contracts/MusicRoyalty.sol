@@ -94,34 +94,32 @@ contract MusicRoyalty {
     }
 
     // ── 개인 라이선스 구매 + 자동 정산 ───────
-    function purchaseLicense(uint256 songId)
-        external payable exists(songId) isActive(songId)
-    {
-        require(msg.value > 0, "Payment required");
-
-        emit LicensePurchased(songId, msg.sender, msg.value, block.timestamp);
-        _distribute(songId, msg.value);
-    }
+	function purchaseLicense(uint256 songId, uint256 amount)
+		external exists(songId) isActive(songId)
+	{
+		require(amount > 0, "Amount required");
+		emit LicensePurchased(songId, msg.sender, amount, block.timestamp);
+		_distribute(songId, amount);
+	}
 
     // ── 내부 분배 로직 ────────────────────────
-    function _distribute(uint256 songId, uint256 amount) internal {
-        Song storage s = _songs[songId];
-        s.totalRevenue += amount;
+	function _distribute(uint256 songId, uint256 amount) internal {
+		Song storage s = _songs[songId];
+		s.totalRevenue += amount;
 
-        uint256 distributed;
-        for (uint256 i = 0; i < s.holders.length; i++) {
-            uint256 payout = (i == s.holders.length - 1)
-                ? amount - distributed
-                : (amount * s.holders[i].share) / 10000;
+		uint256 distributed;
+		for (uint256 i = 0; i < s.holders.length; i++) {
+			uint256 payout = (i == s.holders.length - 1)
+				? amount - distributed
+				: (amount * s.holders[i].share) / 10000;
 
-            if (payout > 0) {
-                (bool ok, ) = s.holders[i].wallet.call{value: payout}("");
-                require(ok, "Transfer failed");
-                emit RoyaltyPaid(songId, s.holders[i].wallet, s.holders[i].role, payout);
-            }
-            distributed += payout;
-        }
-    }
+			if (payout > 0) {
+				// ETH 전송 제거 → 이벤트만 emit
+				emit RoyaltyPaid(songId, s.holders[i].wallet, s.holders[i].role, payout);
+			}
+			distributed += payout;
+		}
+	}
 
     // ── 조회 ─────────────────────────────────
     function getSongInfo(uint256 songId)
