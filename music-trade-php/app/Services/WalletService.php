@@ -38,7 +38,9 @@ class WalletService
         $publicKey = $this->util->privateKeyToPublicKey($privateKey);
 
         // Ethereum 주소 도출 (0x + keccak256(공개키)의 마지막 20바이트)
-        $address = '0x' . $this->util->publicKeyToAddress($publicKey);
+        $address = $this->util->publicKeyToAddress($publicKey);
+
+//        Log::info('address: ' . $address);
 
         return [
             'address'               => $address,
@@ -60,6 +62,8 @@ class WalletService
         try {
             $tx = new Transaction($txData);
             $tx->sign($privateKey);
+//            Log::info('serialized: ' . $serialized);
+
             return '0x' . $tx->serialize();
         } finally {
             // 메모리에서 개인키 즉시 제거

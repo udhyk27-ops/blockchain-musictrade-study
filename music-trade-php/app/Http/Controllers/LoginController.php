@@ -86,7 +86,8 @@ class LoginController extends Controller
             'F_MAIL'           => $request->user_mail,
             'F_WALLET_ADDRESS' => $walletData['address'],
             'F_PRIVATE_KEY'    => $walletData['encrypted_private_key'],
-            'F_REGDATE'        => now(),
+            'F_CREATED_AT'     => now(),
+            'F_UPDATED_AT'     => now(),
             'F_STATUS'         => 'Y',
             'F_ROLE'           => 'user',
         ]);
