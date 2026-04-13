@@ -26,11 +26,27 @@ class Controller
     private function waitForReceipt(BesuService $besu, string $txHash, int $maxWait = 30): ?array
     {
         $deadline = time() + $maxWait;
+        $attempt  = 0;
+
+        Log::info('waitForReceipt start', ['txHash' => $txHash]);
+
         while (time() < $deadline) {
+            $attempt++;
             $receipt = $besu->getTransactionReceipt($txHash);
-            if ($receipt !== null) return $receipt;
+
+            Log::info('waitForReceipt polling', [
+                'attempt' => $attempt,
+                'receipt' => $receipt,
+            ]);
+
+            if ($receipt !== null) {
+                Log::info('waitForReceipt success', ['receipt' => $receipt]);
+                return $receipt;
+            }
             sleep(1);
         }
+
+        Log::warning('waitForReceipt timeout', ['txHash' => $txHash]);
         return null;
     }
 
@@ -54,7 +70,7 @@ class Controller
             'from'     => $from,
             'to'       => config('besu.contract_address'),
             'gas'      => '0x' . dechex($gas),
-            'gasPrice' => $besu->getGasPrice(),
+            'gasPrice' => '0x0',
             'value'    => '0x0',
             'data'     => $calldata,
             'chainId'  => (int) config('besu.chain_id'),
@@ -64,28 +80,44 @@ class Controller
     // 1. 곡 등록
     public function registerSong(Request $request, ContractService $contract, BesuService $besu, WalletService $wallet)
     {
+        // 곡 제목 유효성 검사
         $request->validate(['title' => 'required|string|max:200']);
 
         try {
-            $w        = $this->getUserWallet();
-            $calldata = $contract->encodeRegisterSong($request->title);
-            $txParams = $this->buildTxParams($besu, $w['address'], $calldata);
-            $signedTx = $wallet->signTransaction($w['encrypted_key'], $txParams);
-            $txHash   = $besu->sendRawTransaction($signedTx);
+            // 로그인 사용자의 지갑 주소 + 암호화된 개인키 조회
+            $w = $this->getUserWallet();
 
+            // registerSong(title) 함수 호출용 ABI 인코딩 → calldata 생성
+            $calldata = $contract->encodeRegisterSong($request->title);
+
+            // nonce, gasPrice 조회 후 트랜잭션 파라미터 구성
+            $txParams = $this->buildTxParams($besu, $w['address'], $calldata);
+
+            // DB에서 꺼낸 암호화 개인키로 트랜잭션 ECDSA 서명 → rawTx 생성
+            $signedTx = $wallet->signTransaction($w['encrypted_key'], $txParams);
+
+            // 서명된 rawTx를 Besu에 전송 → txHash 반환
+            $txHash = $besu->sendRawTransaction($signedTx);
+
+            // txHash로 receipt 폴링 (최대 30초 대기)
+            // receipt가 null이거나 status가 0x0(실패)이면 트랜잭션 실패 처리
             $receipt = $this->waitForReceipt($besu, $txHash);
             if (!$receipt || ($receipt['status'] ?? '0x0') !== '0x1') {
                 return response()->json(['success' => false, 'message' => '트랜잭션 실패']);
             }
 
+            // SongRegistered 이벤트 로그의 topics[1]에서 블록체인 songId 파싱
+            // topics[0] = 이벤트 시그니처, topics[1] = indexed songId
             $songId = hexdec(ltrim($receipt['logs'][0]['topics'][1] ?? '0x0', '0x'));
 
+            // 블록체인 등록 성공 후 DB에 곡 정보 저장
+            // f_active = 0 : 지분율 설정 전까지 비활성 상태
             Song::create([
-                'f_song_id'      => $songId,
+                'f_song_id'      => $songId,        // 블록체인 상의 곡 ID
                 'f_title'        => $request->title,
-                'f_producer_no'  => $w['user_no'],
-                'f_active'       => 0,
-                'f_tx_hash'      => $txHash,
+                'f_producer_no'  => $w['user_no'],  // 등록자 (제작사)
+                'f_active'       => 0,              // setShares 완료 후 1로 변경
+                'f_tx_hash'      => $txHash,        // 블록체인 트랜잭션 해시
                 'f_block_number' => hexdec($receipt['blockNumber']),
                 'f_created_at'   => now(),
                 'f_updated_at'   => now(),

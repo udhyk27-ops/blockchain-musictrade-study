@@ -43,6 +43,13 @@
         .login button {
             width: 100%;
             height: 50px;
+            margin-bottom: 10px;
+        }
+
+        a {
+            color: #000000;
+            text-decoration: none;
+            float: right;
         }
 
     </style>
@@ -58,6 +65,7 @@
         <button type="submit">
             <span class="state"><b>LOGIN</b></span>
         </button>
+        <a href="{{ route('register') }}">회원가입</a>
     </form>
 </div>
 
