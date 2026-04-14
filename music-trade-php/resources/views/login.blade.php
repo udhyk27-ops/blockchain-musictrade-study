@@ -60,7 +60,7 @@
     <form class="login" action="{{ route('login.store') }}" method="post">
         @csrf
         <h1>블록체인 음악 저작권 정산 시스템</h1>
-        <input type="text" name="user_id" placeholder="아이디" value="{{ old('user_id') }}" required/>
+        <input type="text" name="user_id" placeholder="아이디" value="{{ old('user_id') }}" required autocomplete="off"/>
         <input type="password" name="user_pwd" placeholder="비밀번호" autocomplete="off" required/>
         <button type="submit">
             <span class="state"><b>LOGIN</b></span>

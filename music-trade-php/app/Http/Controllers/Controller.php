@@ -110,6 +110,8 @@ class Controller
             // topics[0] = 이벤트 시그니처, topics[1] = indexed songId
             $songId = hexdec(ltrim($receipt['logs'][0]['topics'][1] ?? '0x0', '0x'));
 
+            Log::info('registerSong receipt', ['logs' => $receipt['logs']]);
+
             // 블록체인 등록 성공 후 DB에 곡 정보 저장
             // f_active = 0 : 지분율 설정 전까지 비활성 상태
             Song::create([
@@ -166,6 +168,8 @@ class Controller
             $txParams = $this->buildTxParams($besu, $w['address'], $calldata);
             $signedTx = $wallet->signTransaction($w['encrypted_key'], $txParams);
             $txHash   = $besu->sendRawTransaction($signedTx);
+
+            Log::info('setShares txHash', ['txHash' => $txHash]);
 
             $receipt = $this->waitForReceipt($besu, $txHash);
             if (!$receipt || ($receipt['status'] ?? '0x0') !== '0x1') {
@@ -312,8 +316,8 @@ class Controller
             ->with('user')
             ->get()
             ->map(fn($h) => [
-                'user_id' => $h->user->f_id ?? '알 수 없음',
-                'wallet'  => $h->user->f_wallet_address ?? '-',
+                'f_id' => $h->user->f_id ?? '알 수 없음',
+                'f_wallet_address'  => $h->user->f_wallet_address ?? '-',
                 'role'    => $h->f_role,
                 'share'   => ($h->f_share / 100) . '%',
             ]);

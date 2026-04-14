@@ -62,21 +62,21 @@
         </div>
 
         {{-- 라이선스 구매 이력 --}}
-        <div class="section">
-            <h2>라이선스 구매 이력</h2>
-            <p class="section-label">Song ID 비우면 전체 조회</p>
-            Song ID: <input type="number" id="license-songId" placeholder="전체 조회시 입력X" style="width:150px">
-            <button onclick="getLicenseHistory()">조회</button>
-            <div id="license-result" class="result"></div>
-        </div>
+{{--        <div class="section">--}}
+{{--            <h2>라이선스 구매 이력</h2>--}}
+{{--            <p class="section-label">Song ID 비우면 전체 조회</p>--}}
+{{--            Song ID: <input type="number" id="license-songId" placeholder="전체 조회시 입력X" style="width:150px">--}}
+{{--            <button onclick="getLicenseHistory()">조회</button>--}}
+{{--            <div id="license-result" class="result"></div>--}}
+{{--        </div>--}}
 
         {{-- 내 정산 이력 --}}
-        <div class="section">
-            <h2>내 정산 이력</h2>
-            <p class="section-label">내 지갑 기준 전체 조회</p>
-            <button onclick="getRoyaltyHistory()">새로고침</button>
-            <div id="royalty-result" class="result"></div>
-        </div>
+{{--        <div class="section">--}}
+{{--            <h2>내 정산 이력</h2>--}}
+{{--            <p class="section-label">내 지갑 기준 전체 조회</p>--}}
+{{--            <button onclick="getRoyaltyHistory()">새로고침</button>--}}
+{{--            <div id="royalty-result" class="result"></div>--}}
+{{--        </div>--}}
 
         {{-- 전체 곡 수 --}}
         <div class="section">
@@ -130,13 +130,13 @@
         </div>
 
         {{-- 라이선스 구매 --}}
-        <div class="section">
-            <h2>라이선스 구매 (purchaseLicense)</h2>
-            <p class="section-label">구매 즉시 블록체인에 기록</p>
-            Song ID: <input type="number" id="buy-songId" placeholder="Song ID" style="width:80px">
-            <button onclick="purchaseLicense(event)">구매</button>
-            <div id="buy-result" class="result"></div>
-        </div>
+{{--        <div class="section">--}}
+{{--            <h2>라이선스 구매 (purchaseLicense)</h2>--}}
+{{--            <p class="section-label">구매 즉시 블록체인에 기록</p>--}}
+{{--            Song ID: <input type="number" id="buy-songId" placeholder="Song ID" style="width:80px">--}}
+{{--            <button onclick="purchaseLicense(event)">구매</button>--}}
+{{--            <div id="buy-result" class="result"></div>--}}
+{{--        </div>--}}
     </div>
 
 </div>

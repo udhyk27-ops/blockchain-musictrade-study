@@ -1,16 +1,18 @@
-# 블록체인 음악 저작권 정산 시스템
+# 블록체인 음악 저작권 정산 시스템 - SETUP
 
-## 블록체인 환경
+---
+
+## 1. 블록체인 환경
 
 ### Hyperledger Besu
-- VM IP: 192.168.56.101:8545
-- chainId: 1337
-- 합의 알고리즘: **QBFT**
-- blockperiodseconds: 5 (5초마다 블록 생성)
-- requesttimeoutseconds: 10
-- 실행 명령어:
-```bash
+- VM IP: `192.168.56.101:8545`
+- chainId: `1337`
+- 합의 알고리즘: QBFT
+- blockperiodseconds: `30` (승인 기반 서비스 기준)
+- requesttimeoutseconds: `10`
 
+### 노드 실행 명령어
+```bash
 besu \
   --data-path=node1/data \
   --genesis-file=genesis.json \
@@ -21,10 +23,26 @@ besu \
   --rpc-http-host=0.0.0.0 \
   --rpc-http-port=8545 \
   --min-gas-price=0 \
-  --sync-mode=FULL \
+  --p2p-enabled=false \
+  --pruning-enabled=true \
+  --pruning-blocks-retained=1024 \
+  --logging=INFO
+```
+
+besu \
+  --data-path=node/data \
+  --genesis-file=genesis.json \
+  --rpc-http-enabled=true \
+  --rpc-http-api=ETH,NET,QBFT \
+  --host-allowlist="10.84.255.1" \
+  --rpc-http-cors-origins="10.84.255.1" \
+  --rpc-http-host=0.0.0.0 \
+  --rpc-http-port=8545 \
+  --min-gas-price=0 \
+  --p2p-enabled=true \
+  --p2p-port=30303 \
   --logging=INFO
 
-```
 
 ### genesis.json
 ```json
@@ -41,8 +59,9 @@ besu \
     "istanbulBlock": 0,
     "berlinBlock": 0,
     "londonBlock": 0,
+    "zeroBaseFee": true,
     "qbft": {
-      "blockperiodseconds": 5,
+      "blockperiodseconds": 30,
       "epochlength": 30000,
       "requesttimeoutseconds": 10
     }
@@ -53,61 +72,112 @@ besu \
   "difficulty": "0x1",
   "mixHash": "0x63746963616c2062797a616e74696e65206661756c7420746f6c6572616e6365",
   "coinbase": "0x0000000000000000000000000000000000000000",
-  "extraData": "0xf83aa00000000000000000000000000000000000000000000000000000000000000000d5942a923ec5b350f7a99ff3c5868ae0bc5e07bd7097c080c0",
-  "alloc": {
-    "0x1f7a4A61dc265B1F073cd4cA9F6adD499035A689": { "balance": "0x56BC75E2D63100000" },
-    "0xE7Ca71CacabBCc510ad1835df19F1D334B8Bb183": { "balance": "0x56BC75E2D63100000" },
-    "0x0E217137e76482521f72E845Ce24e55B01ce7D8B": { "balance": "0x56BC75E2D63100000" }
-  }
+  "extraData": "현재 노드 주소로 생성한 값",
+  "alloc": {}
 }
-```
-
-### 체인 리셋 시 주의사항
-- `node1/data` 삭제 시 key 파일도 삭제됨 → 노드 주소 바뀜 → extraData 재생성 필요
-- 안전한 리셋 방법:
-```bash
-pkill besu
-cp node1/data/key ./key.backup        # 키 백업
-rm -rf node1/data/database
-rm -rf node1/data/caches
-rm -f node1/data/DATABASE_METADATA.json
-mkdir -p node1/data
-cp ./key.backup node1/data/key        # 키 복원
-# Besu 재시작
 ```
 
 ---
 
-## 컨트랙트
+## 2. 체인 초기화 방법
 
-### 배포 정보
-- 파일: `music-trade-hardhat/contracts/MusicRoyalty.sol`
-- 배포 주소: `0xBC69Cf59bbF7728d0C2984398f5A6C4E7D1DC437`
-- 배포 계정: `0x1f7a4A61dc265B1F073cd4cA9F6adD499035A689`
+### 안전한 리셋 (key 유지 - 노드 주소 변경 없음)
+```bash
+rm -rf node1/data/database
+rm -rf node1/data/caches
+rm -f node1/data/DATABASE_METADATA.json
+```
+
+> key 파일은 절대 삭제하지 않는다. key 파일이 삭제되면 노드 주소가 바뀌고 extraData 재생성이 필요하다.
+
+### extraData 재생성 방법
+```bash
+# 1. 현재 노드 주소 확인 (로그에서 Node address 확인)
+# 2. toEncode.json 생성
+cat > toEncode.json << 'EOF'
+["0x노드주소"]
+EOF
+
+# 3. extraData 생성
+besu rlp encode --from=toEncode.json --type=QBFT_EXTRA_DATA
+
+# 4. 출력값을 genesis.json extraData에 교체
+# 5. 체인 데이터 삭제 후 노드 재시작
+rm toEncode.json
+```
+
+### 블록 생성 확인
+```bash
+curl -s -X POST http://192.168.56.101:8545 \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
+# 0x0에서 올라가면 정상
+```
+
+---
+
+## 3. Hardhat 컨트랙트 배포
+
+### 초기 배포 순서
+```
+1. Besu 노드 실행 (블록 생성 확인)
+2. npx hardhat clean
+3. npx hardhat compile
+4. npx hardhat run scripts/deploy.js --network besu
+5. 출력된 컨트랙트 주소 → .env CONTRACT_ADDRESS 교체
+```
+
+### hardhat.config.js
+```javascript
+require("@nomicfoundation/hardhat-toolbox");
+require("dotenv").config();
+
+module.exports = {
+  solidity: "0.8.19",
+  networks: {
+    besu: {
+      url: process.env.BESU_RPC_URL,
+      chainId: 1337,
+      accounts: [process.env.DEPLOYER_PRIVATE_KEY],
+      gasPrice: 0,
+    },
+  },
+};
+```
+
+### .env (Hardhat)
+```
+BESU_RPC_URL=http://192.168.56.101:8545
+DEPLOYER_PRIVATE_KEY=0x배포계정개인키
+```
+
+### 재배포 시 DB도 함께 초기화
+```sql
+TRUNCATE TABLE T_ROYALTY_HISTORY;
+TRUNCATE TABLE T_LICENSE_PURCHASE;
+TRUNCATE TABLE T_SONG_HOLDER;
+TRUNCATE TABLE T_SONG;
+```
+
+---
+
+## 4. 컨트랙트 정보
 
 ### 역할 상수
-```
-ROLE_PRODUCER = 1  // 음반 제작사
-ROLE_COMPOSER = 2  // 작곡가
-ROLE_LYRICIST = 3  // 작사가
-ROLE_VOCALIST = 4  // 가수
-ROLE_ARRANGER = 5  // 편곡자
-```
+| 값 | 역할 |
+|---|---|
+| 1 | 음반 제작사 |
+| 2 | 작곡가 |
+| 3 | 작사가 |
+| 4 | 가수 |
+| 5 | 편곡자 |
 
 ### 주요 함수
-```
-registerSong(title)                          → 곡 등록 (nonpayable)
-setShares(songId, wallets[], roles[], shares[]) → 지분율 설정 (nonpayable, 등록자만)
-purchaseLicense(songId)                      → 라이선스 구매 + 자동 정산 (payable)
-getSongInfo(songId)                          → 곡 정보 조회 (view)
-getHolders(songId)                           → 홀더 조회 (view)
-getSongCount()                               → 전체 곡 수 (view)
-```
-
-### 지분율 규칙
-- 컨트랙트 내부: 10000 basis point (10000 = 100%)
-- 프론트 입력: 100 기준 → 컨트랙트 전송 시 × 100 자동 변환
-- setShares는 active=false 상태에서만 1회 호출 가능
+| 함수 | 설명 |
+|---|---|
+| `registerSong(title)` | 곡 등록 (nonpayable) |
+| `setShares(songId, wallets[], roles[], shares[])` | 지분율 설정 (등록자만, active=false 상태에서만 1회) |
+| `purchaseLicense(songId, amount)` | 라이선스 구매 + 자동 정산 (nonpayable) |
 
 ### 이벤트
 ```
@@ -118,70 +188,102 @@ LicensePurchased(songId, buyer, amount, timestamp)
 RoyaltyPaid(songId, recipient, role, amount)
 ```
 
----
-
-## MetaMask 계정
-```
-계정 1 (음반 제작사/배포자): 0x1f7a4A61dc265B1F073cd4cA9F6adD499035A689  (100 ETH)
-계정 2 (작곡가/권리자):      0xE7Ca71CacabBCc510ad1835df19F1D334B8Bb183  (100 ETH)
-계정 3 (개인 사용자):        0x0E217137e76482521f72E845Ce24e55B01ce7D8B  (100 ETH)
-```
+### 지분율 규칙
+- 컨트랙트 내부: 10000 basis point (10000 = 100%)
+- setShares 후 곡이 active 상태로 변경됨
+- active 상태에서는 setShares 재호출 불가
 
 ---
 
-## Laravel 11 프로젝트
+## 5. Laravel 11 프로젝트
 
 ### .env 주요 설정
 ```
 BESU_RPC_URL=http://192.168.56.101:8545
 BESU_CHAIN_ID=1337
-CONTRACT_ADDRESS=0xBC69Cf59bbF7728d0C2984398f5A6C4E7D1DC437
+CONTRACT_ADDRESS=0x배포된컨트랙트주소
 ```
 
 ### 설치된 패키지
+| 패키지 | 용도 |
+|---|---|
+| `web3p/ethereum-tx` | 트랜잭션 ECDSA 서명 |
+| `web3p/ethereum-util` | 지갑 생성 (개인키 → 주소 도출) |
+| `web3p/web3.php` | ABI 인코딩 |
+| `yajra/laravel-oci8` | Oracle DB 연결 |
+
+### 구현 파일 목록
 ```
-web3p/web3.php       → 백엔드 Besu RPC 통신
-kornrunner/keccak    → 해시 연산
-yajra/laravel-oci8   → Oracle DB 연결
+app/Services/BesuService.php        → Besu JSON-RPC 통신
+app/Services/ContractService.php    → ABI 인코딩 (calldata 생성)
+app/Services/WalletService.php      → 지갑 생성 / 트랜잭션 서명
+app/Models/User.php                 → T_USER
+app/Models/Song.php                 → T_SONG
+app/Models/SongHolder.php           → T_SONG_HOLDER
+app/Models/LicensePurchase.php      → T_LICENSE_PURCHASE
+app/Models/RoyaltyHistory.php       → T_ROYALTY_HISTORY
+app/Http/Controllers/Controller.php
+app/Http/Controllers/LoginController.php
+config/besu.php
+resources/views/index.blade.php
+resources/views/login.blade.php
+resources/views/register.blade.php
 ```
 
 ### DB 테이블 (Oracle)
 ```
-T_USERS    → wallet_address VARCHAR2(42) 컬럼 포함
-T_SONGS
-T_HOLDERS
-T_LICENSES
-```
-
-### 구현 완료 파일
-```
-app/Services/BesuService.php      → Besu RPC 통신
-app/Services/ContractService.php  → web3p/web3.php 컨트랙트 호출
-app/Http/Controllers/Controller.php
-config/besu.php
-resources/views/index.blade.php   → ethers.js CDN + MetaMask 연동
-```
-
-### index.blade.php 구현 기능
-```
-지갑 연결/해제 (MetaMask)
-1. 곡 등록               → 지갑 필요 (트랜잭션)
-2. 지분율 설정           → 지갑 필요 (트랜잭션, 등록자만)
-3. 라이선스 구매         → 지갑 필요 (트랜잭션 + ETH 송금)
-4. 곡 정보 조회          → 지갑 불필요 (read-only)
-5. 지분율 조회           → 지갑 불필요 (read-only)
-6. 라이선스 구매 이력    → 지갑 불필요 (이벤트 로그)
-7. 정산 이력             → 지갑 불필요 (이벤트 로그, songId/지갑 필터)
-8. 전체 곡 수            → 지갑 불필요 (read-only)
+T_USER             → F_WALLET_ADDRESS, F_PRIVATE_KEY(암호화) 포함
+T_SONG
+T_SONG_HOLDER
+T_LICENSE_PURCHASE
+T_ROYALTY_HISTORY
+T_APPROVAL         → 승인 요청 (추후 구현)
+T_APPROVAL_MEMBER  → 승인자별 상태 (추후 구현)
 ```
 
 ---
 
-## 다음 진행할 것
-1. 로그인/회원가입 구현 (이메일 + 비밀번호)
-2. 로그인 후 MetaMask 지갑 연결 → wallet_address DB 저장
-3. 권한 구조 적용
-   - 비로그인: 조회만 가능
-   - 로그인: 내 이력 조회
-   - 로그인 + 지갑 연결: 트랜잭션 가능
-4. 신규 회원가입 시 가스비 Faucet 기능
+## 6. 서버 사이드 서명 방식
+
+```
+회원가입
+→ 서버에서 Ethereum 규격 지갑 자동 생성
+   (random_bytes(32) → secp256k1 → keccak256 → 주소)
+→ 개인키 AES-256 암호화 후 DB 저장
+→ 개인키는 프론트로 절대 전송하지 않음
+
+트랜잭션 흐름
+→ DB에서 개인키 복호화
+→ nonce / gasPrice 조회 (BesuService)
+→ calldata ABI 인코딩 (ContractService)
+→ ECDSA 서명 (WalletService)
+→ eth_sendRawTransaction (BesuService)
+→ receipt 폴링 (최대 60초)
+→ status: 0x1 확인 후 DB 저장
+
+조회
+→ 모든 조회는 DB에서만 (Besu RPC 호출 없음)
+→ 트랜잭션 성공 후 DB에 동기화된 데이터 사용
+```
+
+---
+
+## 7. 추후 구현 예정
+
+### 승인 기반 수정 흐름
+```
+수정 요청
+→ T_APPROVAL에 임시 저장 (블록체인 미등록)
+→ 연관 사용자에게 메일 전송
+→ 전원 승인 완료
+→ 블록체인 트랜잭션 전송
+→ receipt 확인 후 DB 저장
+```
+
+### Laravel Queue 적용
+```
+트랜잭션 백그라운드 처리
+→ txHash 즉시 반환
+→ 큐에서 receipt 폴링
+→ 완료 시 사용자 알림
+```
